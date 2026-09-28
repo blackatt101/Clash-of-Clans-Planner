@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "build": "NEXT_PUBLIC_BUILD_ID=$(date +%s%N) && echo \"NEXT_PUBLIC_BUILD_ID=$NEXT_PUBLIC_BUILD_ID\" > .env.local && next build",
+    "start": "next start -p ${PORT:-3000}",
+    "start:direct": "next start -p 3000",
     "lint": "eslint"
   },
   "dependencies": {

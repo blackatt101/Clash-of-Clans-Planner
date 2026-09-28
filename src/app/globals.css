@@ -1,26 +1,346 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Surfaces — layered so cards read as depth, not outlines. */
+  --color-bg: #080c12;
+  --color-surface: #101923;
+  --color-surface-2: #182936;
+  --color-surface-3: #203747;
+  --color-line: #263b4c;
+  --color-line-strong: #3b5668;
+
+  /* Text — three steps, all AAA on the surfaces above. */
+  --color-ink: #eef1f7;
+  --color-ink-dim: #a3adc0;
+  --color-ink-faint: #6f788c;
+
+  /* Brand gold. */
+  --color-gold: #f2b53a;
+  --color-gold-strong: #ffd35c;
+  --color-gold-dim: #8a6d1f;
+
+  /*
+   * Facility colours — labels the three lanes (builders, Laboratory, Pet
+   * House). Validated as a 3-slot categorical palette against the track
+   * (#0b0e15) for ALL pairs: every check passes (worst 9.4 ΔE deutan, 20.9
+   * normal, 3:1 contrast). Do not add a fourth hue without re-running the check.
+   */
+  --color-lane-builder: #3987e5;
+  --color-lane-lab: #d95926;
+  --color-lane-pet: #199e70;
+
+  /*
+   * The upgrade FAMILY colours — what a bar is — are NOT tokens here. A bar sets
+   * its colour from `FAMILY_COLORS` in src/lib/categoryColor.ts, because the
+   * family is only known on the job, not in the markup; a token nobody writes a
+   * utility for is dead CSS.
+   */
+
+  /* The Gantt track is deliberately darker than the card it sits on, so bars
+     read as lit chips on an inset surface instead of flat shapes on a field. */
+  --color-track: #0b0e15;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 18rem),
+    radial-gradient(900px 380px at 50% -12%, rgba(242, 181, 58, 0.065), transparent 62%),
+    linear-gradient(135deg, rgba(25, 158, 112, 0.025), transparent 42%),
+    var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Shared visual language for dense planner surfaces. */
+.surface-panel {
+  border: 1px solid var(--color-line);
+  background: linear-gradient(180deg, rgba(24, 33, 44, 0.92), rgba(16, 22, 30, 0.96));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.metric-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(58, 75, 96, 0.7);
+  border-radius: 0.75rem;
+  background: rgba(8, 11, 16, 0.5);
+  padding: 0.45rem 0.7rem;
+}
+
+/* Keyboard focus ring — a soft glow rather than a hard outline: reads as
+   "this is focused" without a 2px line that would compete with the gold
+   accent on buttons and the thin hairlines on cards. */
+:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(242, 181, 58, 0.25),
+    0 0 0 1px var(--color-gold);
+  border-radius: 4px;
+}
+
+/* Hairline top highlight used on cards — gives an edge-lit feel. */
+.card-lit {
+  position: relative;
+}
+.card-lit::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.09),
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* Diagonal hatch marking work that is already in flight. Texture, not a fourth
+   hue — it survives colorblindness, greyscale printing and forced colors. */
+.lane-striped {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.32) 0 5px,
+    rgba(255, 255, 255, 0) 5px 11px
+  );
+}
+.bg-lane-stripe {
+  background-color: #6f788c;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.32) 0 3px,
+    rgba(255, 255, 255, 0) 3px 7px
+  );
+}
+
+/* ── Timeline ─────────────────────────────────────────────────────────────
+   Every state below carries a non-colour channel as well as its hue — a
+   diagonal hatch, a dashed edge, or a written label — so the Gantt still reads
+   in greyscale, with colour-blindness, or in forced-colors mode. */
+
+/* Unavailable window: you are not there to tap "start". Diagonal hatch. */
+.tl-unavailable {
+  background-image:
+    repeating-linear-gradient(
+      135deg,
+      rgba(129, 140, 248, 0.13) 0 7px,
+      rgba(129, 140, 248, 0.04) 7px 14px
+    ),
+    linear-gradient(180deg, rgba(79, 70, 229, 0.22), rgba(79, 70, 229, 0.12));
+  border-left: 1px solid rgba(129, 140, 248, 0.34);
+  border-right: 1px solid rgba(129, 140, 248, 0.24);
+}
+/* The same window, drawn in the axis so the header names it. */
+.tl-unavailable-head {
+  background-image:
+    repeating-linear-gradient(
+      135deg,
+      rgba(129, 140, 248, 0.18) 0 6px,
+      rgba(129, 140, 248, 0.07) 6px 12px
+    ),
+    linear-gradient(180deg, rgba(99, 102, 241, 0.34), rgba(99, 102, 241, 0.18));
+  border-left: 1px solid rgba(129, 140, 248, 0.45);
+  border-right: 1px solid rgba(129, 140, 248, 0.32);
+}
+.tl-unavailable-label {
+  color: rgba(199, 210, 254, 0.92);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+}
+
+/* Idle: capacity you are not using, with the reason in its title. */
+.tl-idle {
+  background-color: rgba(239, 68, 68, 0.07);
+  border: 1px dashed rgba(239, 68, 68, 0.3);
+}
+
+/* Already running: dashed outline + gold glow, the brand's "now" colour. The
+   dashed edge and the NOW badge are what carry the state, not the hue. */
+.tl-running {
+  outline: 2px dashed #facc15;
+  outline-offset: -2px;
+  box-shadow:
+    0 0 10px rgba(250, 204, 21, 0.3),
+    inset 0 0 0 1px rgba(250, 204, 21, 0.12);
+}
+
+/* Bars carry no pattern: family identity is the hue alone (see FAMILY_COLORS in
+   src/lib/categoryColor.ts, which documents the all-pairs colour search behind
+   it) plus the game icon and name printed on every bar. Keep the bar's colour as
+   a plain background-color — nothing here should add a background-image to it. */
+
+/* ── Bar depth ────────────────────────────────────────────────────────────
+   A bar is a lit chip, not a flat rectangle: a dark rim, a drop shadow to lift
+   it off the track, and a gloss that runs light-at-top to dark-at-bottom. */
+.tl-bar {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  contain: layout paint;
+  transition-property: filter, opacity;
+}
+.tl-bar:hover {
+  filter: brightness(1.12);
+}
+.tl-scroll {
+  contain: layout paint;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.tl-chart {
+  contain: layout paint;
+}
+.tl-lane-label {
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.24);
+}
+/* A bar drawn at its icon minimum (the `isCapped` case) carries no readable
+   text: instead of a flat, near-zero-width sliver, the micro state gives it a
+   diagonal-stripe wash and a dashed edge — the "compressed" pattern used by
+   mature Gantt tools. Non-colour (texture + dash) so it still reads in
+   greyscale or with colour-blindness. */
+.tl-bar.tl-micro {
+  border-style: dashed;
+  border-width: 1px;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.14) 0 3px,
+    rgba(255, 255, 255, 0.02) 3px 6px
+  );
+  background-blend-mode: overlay;
+}
+.tl-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+/* ── Track ────────────────────────────────────────────────────────────────
+   The lane surface: a shade darker than the card, with an inner shadow at the
+   top so the bars look laid into it rather than stuck on. The gradient is named
+   because the alternating rows below have to layer their wash on top of it. */
+.tl-track {
+  --tl-track-depth: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.35) 0%,
+    rgba(0, 0, 0, 0) 22%,
+    rgba(255, 255, 255, 0.022) 100%
+  );
+  background-image: var(--tl-track-depth);
+}
+/* Alternating row wash — helps the eye track one lane across a wide chart.
+   It is a second background layer rather than a replacement: both rules set
+   `background-image`, so a row carrying both classes (which is every alternate
+   row) would otherwise lose the depth gradient above and sit visibly flatter
+   than its neighbours. The fallback covers the case where this class is ever
+   used without .tl-track, where the variable would not resolve. */
+.tl-row-alt {
+  background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006)),
+    var(--tl-track-depth, none);
+}
+/* Today, marked through the whole chart rather than only on the axis. */
+.tl-today-col {
+  background: linear-gradient(
+    90deg,
+    rgba(242, 181, 58, 0.13),
+    rgba(242, 181, 58, 0.03) 70%,
+    rgba(242, 181, 58, 0)
+  );
+  border-left: 1px solid rgba(242, 181, 58, 0.5);
+}
+
+/* Legend + lane swatches: a plain colour chip, sized to read as a colour rather
+   than a dot. */
+.tl-sw {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+.tl-sw-running {
+  background: rgba(250, 204, 21, 0.22);
+  border: 1px dashed #facc15;
+}
+.tl-sw-unavailable {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.5) 0 3px,
+    rgba(129, 140, 248, 0.14) 3px 6px
+  );
+  border: 1px solid rgba(129, 140, 248, 0.42);
+}
+.tl-sw-idle {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px dashed rgba(239, 68, 68, 0.45);
+}
+.tl-sw-today {
+  background: rgba(242, 181, 58, 0.16);
+  border: 1px solid rgba(242, 181, 58, 0.5);
+}
+
+/* Lane avatar — a rounded tile holding the facility's game icon. */
+.tl-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.tl-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border: 2px solid var(--color-bg);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #46516a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

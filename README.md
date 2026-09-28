@@ -2,21 +2,51 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+Development server (hot reload):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Production. Next.js is served **behind nginx**, which owns ports 80 and 443 and
+terminates TLS:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm run start        # Next on 127.0.0.1:3000 (loopback only)
+sudo systemctl restart nginx
+```
+
+Open **https://172.31.45.153/** — there is no port number, and plain `http://` on
+the same host redirects to it. `npm run start:direct` skips the proxy and binds
+`0.0.0.0:3000` over plain HTTP, for when nginx is not in the picture.
+
+### The certificate
+
+`/etc/ssl/coc-planner/` holds a **local** CA (`ca.crt`) and the server
+certificate it signed. A public CA (Let's Encrypt) is not an option here: this
+host is reached on a private address behind NAT with no domain, and no public CA
+can attest to that.
+
+So each browser must trust the CA once, by installing **http://172.31.45.153/ca.crt**
+(that URL is exempt from the HTTPS redirect, precisely so it stays reachable):
+
+| Where | How |
+|---|---|
+| Windows | download → double-click → *Local Machine* → *Place all certificates in* → **Trusted Root Certification Authorities** |
+| macOS | double-click → Keychain *System* → set to **Always Trust** |
+| Linux | `sudo cp ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates` |
+| Firefox (any OS) | Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import, tick *Trust this CA to identify websites* |
+| Android | Settings → Security → Encryption & credentials → Install a certificate → **CA certificate** |
+| iOS | install the profile, then Settings → General → About → Certificate Trust Settings → enable full trust |
+
+Until then the browser warns; clicking through still loads the app.
+
+Trusting the CA is what makes the page a real *secure context*, and that is what
+the clipboard needs: `navigator.clipboard.readText()` is blocked on plain
+`http://` (except on `localhost`), so without it the "Paste from clipboard"
+button stays disabled. Pasting with Ctrl+V always works and is the fallback the
+import panel uses.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

@@ -1,0 +1,96 @@
+npm notice run coc-planner@0.1.0 npx
+npm notice run 'next' start -p 3000
+[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+- Local:         http://localhost:3000
+- Network:       http://172.31.45.153:3000
+[32m[1m✓[22m[39m Ready in 92ms
+[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+[32m[1m✓[22m[39m Running next.config.ts took 21ms
+npm notice run coc-planner@0.1.0 npx
+npm notice run 'next' start -p 3000
+[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+- Local:         http://localhost:3000
+- Network:       http://172.31.45.153:3000
+[32m[1m✓[22m[39m Ready in 98ms
+[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+[32m[1m✓[22m[39m Running next.config.ts took 22ms
+npm notice run coc-planner@0.1.0 npx
+npm notice run 'next' start -p 3000
+[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+- Local:         http://localhost:3000
+- Network:       http://172.31.45.153:3000
+[32m[1m✓[22m[39m Ready in 94ms
+[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+[32m[1m✓[22m[39m Running next.config.ts took 22ms
+npm notice run coc-planner@0.1.0 npx
+npm notice run 'next' start -p 3000
+[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+- Local:         http://localhost:3000
+- Network:       http://172.31.45.153:3000
+[32m[1m✓[22m[39m Ready in 97ms
+[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+[32m[1m✓[22m[39m Running next.config.ts took 22ms
+[DEBUG ERROR] {
+  "message": "probe",
+  "build": "test",
+  "ts": 1
+}
+npm notice run coc-planner@0.1.0 npx
+npm notice run 'next' start -p 3000
+[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+- Local:         http://localhost:3000
+- Network:       http://172.31.45.153:3000
+[32m[1m✓[22m[39m Ready in 99ms
+[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+[32m[1m✓[22m[39m Running next.config.ts took 22ms
+npm notice run coc-planner@0.1.0 npx
+npm notice run 'next' start -p 3000
+[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+- Local:         http://localhost:3000
+- Network:       http://172.31.45.153:3000
+[32m[1m✓[22m[39m Ready in 95ms
+[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+[32m[1m✓[22m[39m Running next.config.ts took 22ms
+[DEBUG ERROR] {
+  "message": "probe",
+  "build": "probe",
+  "ts": 1
+}
+npm notice run coc-planner@0.1.0 npx
+npm notice run 'next' start -p 3000
+[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+- Local:         http://localhost:3000
+- Network:       http://172.31.45.153:3000
+[32m[1m✓[22m[39m Ready in 101ms
+[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+[32m[1m✓[22m[39m Running next.config.ts took 22ms
+Error: The Server Reference ID did not match the expected format. Received "x".
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+    at [3mignore-listed frames[23m
+Error: The Server Reference ID did not match the expected format. Received "x".
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+    at [3mignore-listed frames[23m
+npm notice run coc-planner@0.1.0 start
+npm notice run next start -p ${PORT:-3000}
+[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+- Local:         http://localhost:3000
+- Network:       http://172.31.45.153:3000
+[32m[1m✓[22m[39m Ready in 110ms
+[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+[32m[1m✓[22m[39m Running next.config.ts took 35ms
