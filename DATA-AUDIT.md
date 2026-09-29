@@ -131,3 +131,14 @@ The `bbRush.ts` comment (lines 43–46) states "at Builder Hall 8 the ceilings a
 | 4 | Major | `src/lib/bbRush.ts` lines 96–100 | Document that `GEAR_UP_SECONDS` values are hardcoded game constants not derivable from the data file. No code change unless values are confirmed wrong. |
 
 No changes to `BB_HALL_CAPACITY` or `BB_STORAGE_CAPACITY` are required based on this audit.
+
+## Resume pass — 2026-09-29 (status re-verified against current tree)
+
+| # | Status 2026-09-29 |
+|---|-------------------|
+| 1 | **Fixed 2026-09-29.** The parameter was added (`townhall_req(it, lv, fname)`) but the call site still passed two arguments — the script would `TypeError` on any run. Call site now `townhall_req(it, lv, f)`. Latent-while-unused: the committed `public/data/*.json` predates the change and was not regenerated. |
+| 2 | **Applied, widened** (bbRush.ts): `BB_DEFENSE_MAX_LEVEL` + `canReach9` on the auto path, manual picks below target rejected with fall-through to auto, `ScheduleSettings.tsx` labels X-Bow "caps at 5, auto pick instead". Same fix as LOGIC-AUDIT #24. |
+| 3 | Intentional behaviour, unchanged. |
+| 4 | Documented as intended; additionally typed `Record<GearUpKey, number>` so a key rename is a compile error (LOGIC-AUDIT #25). Values still unverified against an external wiki — accept as planner constants. |
+| 5 | Verification, nothing to fix. |
+| 6, 7, 8 | Verification, nothing to fix. |

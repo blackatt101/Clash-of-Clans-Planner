@@ -58,7 +58,7 @@ for f in FILES:
                 "l": lv.get("level"),
                 "cost": cost,
                 "time": time_of(lv),
-                "th": townhall_req(it, lv),
+                "th": townhall_req(it, lv, f),
                 "lab": lv.get("required_lab_level"),
                 "bs": lv.get("required_blacksmith_level"),
                 "ph": lv.get("required_pet_house_level"),

@@ -2,6 +2,40 @@
 
 All findings below were adversarially verified against the code. "Fix status" reflects the state at audit time: most already have a fix in the working tree; where not, the one-line fix is given so it can be applied directly.
 
+## Resume pass — 2026-09-29 (status re-verified against current tree)
+
+Every finding re-checked against the code as it stands after the 2026-09-26→28 patch rounds:
+
+| # | Finding | Status 2026-09-29 |
+|---|---------|-------------------|
+| 1 | hero-cap in-flight seed | **Applied** (`respectHeroCap` seeded from actual spans) |
+| 2 | empty hero lane keeps slot | **Applied** |
+| 3 | `startIn` hole-fill used `s.start` | **Applied** |
+| 4 | cap push bypassed `wiggleRoom` | **Applied** |
+| 5 | non-contiguous chain `currentLevel` | **Applied** (`prev` tracking, L529/562/571) |
+| 6 | `anchor===0` conflation | **Applied** (`otherWorkPlanned`, L520/524) |
+| 7 | stale Star Lab gate blocker | **Applied** (`pendingLabGates` defer, bbGoal L738-741) |
+| 8 | gear-up row indistinguishable | **Applied in data**: `commit()` uses `c.gearUp.label` + `currentLevel: c.level`, no `levelFrom/levelTo` (L848/857/912). UI marker on `UpgradeOption`: moot — bbGoal rows carry the gear-up's own name/level pair. |
+| 9 | in-flight levels unrecorded | **Applied** (simLevel/record after place-loop) |
+| 10 | in-flight on locked OTTO lane | **Applied** (`place` skips `!Number.isFinite(laneUnlock[i])`) |
+| 11 | in-flight Star Lab on builder lane | **Applied** (bbGoal L384: `ip.kind === "lab" \|\| ip.entityId === BB_STAR_LAB`) |
+| 12 | `start===end` = 24 h block | **Applied** (sleep.ts L79-87: zero-width blocks nothing) |
+| 13 | `parseClock` silent 0 | **Applied** (L202-206: returns null on malformed/empty) |
+| 14 | escape measured from `t` | **Applied** (L195: `next - cur`) |
+| 15 | escape unreachable for all-day | **Neutralized by 12** (0/0 blocks nothing; the documented path applies to any residual degenerate spec via the 14-fix) |
+| 16 | CWL `unblockedAt` past date | **Applied** (L163-164: returns `t` when unblocked) |
+| 17 | same as 16 | **Applied** (consolidated — single fix) |
+| 18 | all-day clamp 1 h off DST | **Applied** (L85-87: `wallClock(dayStart(+1), 0)`) |
+| 19 | facility self-gate contradiction | **Applied** (upgrade.ts L370-390: facility's own row gated by `first.th` via levelGate, doc rewritten) |
+| 20 | mid-upgrade-to-max dropped | **Applied** (upgrade.ts L478-495: `terminalInFlight` placeholder row) |
+| 21 | Outpost/Gem Mine L1 offered | **Applied** (upgrade.ts L340-345: L0→L1 rows skipped, L2+ follow-ups only) |
+| 22 | dead `BUILDABLE_TYPES` + hoist | **Applied** (`facilitiesForVillage` hoisted L328; set deleted, note at L234) |
+| 23 | gear-up flag semantics | **No change needed** (re-verified not a bug; global fallback is documented design) |
+| 24 | X-Bow chained to 9 | **Applied** — stronger than the refined fix: `bbDefenseTarget` rejects a manual pick below target (L579-586) and `ScheduleSettings.tsx` L616 labels the option "caps at 5, auto pick instead" |
+| 25 | `GearUpKey` type | **Applied** (L158-161: `GearUpKey`, `Record<GearUpKey, number>`) |
+
+**Open at resume:** none in this document — every confirmed finding is fixed in the working tree or re-verified as not-a-bug. One regression was found and fixed outside this doc: `slim_data.py`'s call site had not been updated when `townhall_req` gained the `fname` parameter (see DATA-AUDIT #1).
+
 ## Critical
 
 ### 1. In-flight hero cap seed assumes all in-flight heroes start at t=0
