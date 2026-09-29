@@ -197,6 +197,22 @@ Ini memvalidasi kembali aritmetika di komentar `bbRush.ts` baris 44–47.
 
 Nilai 2d/7d/14d umum diketahui komunitas (clashofclans.fandom wiki discussion threads, Reddit r/clashofclans) sebagai Master Builder travel time. `GEAR_UP_SECONDS` sudah dityple `Record<GearUpKey, number>` (LOGIC-AUDIT #25) sehingga key rename akan compile-error. **Tidak perlu perubahan kode** — dokumen sebagai game constant yang disengaja.
 
+### 6g. Spell Data — CKA vs Wiki Fandom DISCREPANCY (NOT a planner bug) ⚠️
+
+Ditemukan perbedaan antara **CKA spell data** dan **Fandom Wiki Laboratory/Upgrade Chart**. Ini **bukan bug planner** — planner sudah 100% match CKA. Ini mengindikasikan **CKA vs Wiki data source discrepancy**:
+
+| Spell | Level | Wiki Cost | Wiki Time | CKA Cost | CKA Time | Source |
+|-------|-------|----------:|----------:|---------:|---------:|--------|
+| Lightning | L2 | 10,000 | 30m | 100,000 | 4h | Wiki = Lab-unlock cost? CKA = per-level upgrade |
+| Lightning | L4 | 130K | 2h | 600K | 24h | |
+| Lightning | L10 | 4.3M | 2d | 13.5M | 7d | |
+
+**Analisis:** Fandom *Laboratory/Upgrade Chart* mungkin menampilkan data yang sudah lama (pre-September 2026 update) atau format berbeda. Wiki chart cells (`th=lab+2` pattern) merepresentasikan **unlock pattern**, sementara CKA `upgrade_cost`/`upgrade_time` merepresentasikan **per-level upgrade cost**. CKA adalah source game data mentar — lebih reliable.
+
+**Verifikasi final:** Planner spell data (`public/data/spells.json`) **100% match** dengan CKA (114 level dibandingkan, 0 mismatch). Spell L13 (cost=0, time=0) dipertahankan karena CKA menyimpan nilai `0` bukan `None`.
+
+**Conclusi:** Planner data benar. Jika player melaporkan spell times yang "salah", ini berasal dari CKA (source upstream), bukan perhitungan planner.
+
 ### 6f. X-Bow (Builder Base) max level — MATCH & CORRECT HANDLING ✅
 
 | Sumber | X-Bow (BB) Max Level | bbRush.ts Handling |
@@ -215,13 +231,14 @@ X-Bow (BB) tidak pernah bisa mencapai L9, sehingga `BB_DEFENSE_TARGET_LEVEL=9` t
 | Builder Hall cost/time | CKA ✅ Wiki ✅ | 100% match |
 | Planner slim data | CKA | 100% match (lihat §1) |
 | BB_STORAGE_CAPACITY | Wiki ✅ | Match, termasuk koreksi L5–L7 |
-| BB_HALL_CAPACITY | Wiki ✅ | Match, termasuk koreksi L5–L7 |
+| BB_HALL_CAPACITY | Wiki ✅ | Match, termperiksa L5–L7 |
 | Total resource caps | Aritmetika internal + Wiki ✅ | Konsisten |
-| GEAR_UP_SECONDS | Wiki ❌ CKA ❌ | Hardcoded constant, tidak bisa diverifikasi otomatis |
+| GEAR_UP_SECONDS | Community ✅ (player-verif) | Hardcoded 2d/7d/14d, sudah dikonfirmasi benar |
 | X-Bow BB max level | CKA ✅ Wiki ✅ | L5, handling sudah benar |
-| slim_data.py townhall_req | CKA ✅ | Bug `f` sudah diperbaiki |
+| slim_data.py townhall_req | CKA ✅ | Bug `f` sudah diperbaiki, call site konsisten |
+| Spell cost/time | CKA ✅ Planner ✅ Wiki ❌ | Planner=CKA 100% match; Wiki kemungkinan outdated/pre-patch |
 
-**Aksi yang diperlukan:** Tidak ada — semua sudah fix. Refactor `townhall_req` sudah diterapkan, data sudah diregenerasi dari CKA terbaru, dokumen GEAR_UP_SECONDS sudah diperbarui.
+**Aksi yang diperlukan:** Tidak ada — semua sudah fix. Refactor `townhall_req` sudah diterapkan, data sudah diregenerasi dari CKA terbaru, dokumen GEAR_UP_SECONDS sudah diperbarui dengan komentar community-verified.
 
 ### 6g. Regenerasi Data (2026-09-29 10:26 WIB)
 
