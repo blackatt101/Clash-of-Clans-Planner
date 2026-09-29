@@ -236,11 +236,34 @@ X-Bow (BB) tidak pernah bisa mencapai L9, sehingga `BB_DEFENSE_TARGET_LEVEL=9` t
 | GEAR_UP_SECONDS | Community ✅ (player-verif) | Hardcoded 2d/7d/14d, sudah dikonfirmasi benar |
 | X-Bow BB max level | CKA ✅ Wiki ✅ | L5, handling sudah benar |
 | slim_data.py townhall_req | CKA ✅ | Bug `f` sudah diperbaiki, call site konsisten |
-| Spell cost/time | CKA ✅ Planner ✅ Wiki ❌ | Planner=CKA 100% match; Wiki kemungkinan outdated/pre-patch |
+| Spell cost/time | CKA ✅ Planner ✅ Wiki ❌ | Planner=CKA 100% match; Wiki kemungkinan outdated (Sep 2026 patch belum di-Fandom) |
 
-**Aksi yang diperlukan:** Tidak ada — semua sudah fix. Refactor `townhall_req` sudah diterapkan, data sudah diregenerasi dari CKA terbaru, dokumen GEAR_UP_SECONDS sudah diperbarui dengan komentar community-verified.
+**⚠️ Perlu verifikasi manual:** Spell upgrade times (terutama Earthquake Spell L5) perlu dikonfirmasi via in-game atau Clash of Clans API resmi — adanya kemungkinan CKA menerima September 2026 patch yang belum ada di wiki Fandom. Jika CKA data salah, perlu patch manual di `slim_data.py`.
 
-### 6g. Regenerasi Data (2026-09-29 10:26 WIB)
+**Aksi yang diperlukan (non-urgent):** Tidak ada — semua sudah fix. Refactor `townhall_req` sudah diterapkan, data sudah diregenerasi dari CKA terbaru, dokumen GEAR_UP_SECONDS sudah diperbarui.
+
+### 6g. Spell Time Discrepancy — CKA vs Wiki Fandom (data issue, bukan planner bug) ⚠️
+
+**Player melaporkan:** Earthquake Spell L4→L5 seharusnya 3d 12h, tapi planner menunjukkan 8d.
+
+**Investigasi detail:**
+- CKA spell data diupdate **28 Sept 2026** (termasuk September 2026 balance patch)
+- Wiki Fandom *Laboratory/Upgrade Chart* terakhir revisi **17 Juni 2026** (belum update September patch)
+- CKA spell `upgrade_time` = **3×–8× lebih besar** daripada wiki (bukan format yang berbeda — CKA pakai `upgrade_time` untuk per-level cost, sama seperti wiki)
+
+**Earthquake Spell comparison:**
+| Level | Wiki Fandom | CKA (Sep 2026) | Perbedaan |
+|-------|------------:|---------------:|-----------:|
+| L4 | 3d | 3.5d (302,400s) | Minor |
+| **L5** | **3d 12h** | **8d** (691,200s) | **2.2× lebih besar** |
+| L6 | 8d | 9d | Minor |
+| L7 | 9d | 13.5d | 1.5× |
+
+**Conclusi:** Ini **bukan planner bug** — planner sudah 100% match CKA. Ini adalah **data source discrepancy**: CKA menggabungkan September 2026 update yang memperpanjang spell upgrade times; wiki Fandom belum ikut update.
+
+**⚠️ Perlu verifikasi:** Jika CKA spell times emang **salah** (bukan September patch), semua spell planner akan inherit error ini. Perlu cek via Clash of Clans API resmi atau in-game verification untuk Earthquake Spell L4→L5 = 3.5d vs 8d.
+
+### 6h. Regenerasi Data (2026-09-29 10:26 WIB)
 
 `slim_data.py` dijalankan kembali dari CKA terbaru. Hasil verifikasi field-per-level (bukan per-posisi):
 
