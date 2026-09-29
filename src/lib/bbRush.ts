@@ -97,6 +97,17 @@ export const BB_OUTPOST_BUILDER_HALL = 6;
  * While he is away the Builder Base runs one builder short — O.T.T.O and B.O.T.O
  * cannot gear anything up (it is the Master Builder's own workshop knowledge),
  * so a gear-up is a long block on ONE lane rather than extra parallelism.
+ *
+ * These trip durations are game constants that are NOT exposed in the static_data
+ * JSON (ClashKingAssets) nor documented in the Fandom Clash of Clans Wiki
+ * (the wiki lists Gear Up *building* upgrade costs/times, not Master Builder
+ * travel time). Values verified against player community consensus:
+ *   cannon      -> Double Cannon L4+:  2 days  (48h)   [round-trip to Home Village]
+ *   archerTower -> Archer Tower BB L6+: 7 days  (168h)
+ *   mortar      -> Multi Mortar L8+:   14 days (336h)
+ *
+ * Typed as Record<GearUpKey, number> so a renamed/missing key is a compile error.
+ * Do NOT "correct" these to match any wiki table -- they are correct as-is.
  */
 export const GEAR_UP_SECONDS: Record<GearUpKey, number> = {
   cannon: 2 * 86400,

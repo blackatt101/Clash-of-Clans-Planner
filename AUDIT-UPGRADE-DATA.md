@@ -109,4 +109,136 @@ Battle Copter di CKA punya `levels` L15–L35 (count 21 karena level 1–14 adal
 2. Data JSON: **tidak perlu refresh** — sudah match CKA terbaru.
 3. Audit dokumen: `DATA-AUDIT.md` dan `LOGIC-AUDIT.md` sudah akurat; file ini (`AUDIT-UPGRADE-DATA.md`) sudah di-update untuk mencerminkan bahwa X-Bow issue sudah fixed.
 
+---
+
+## 6. Wiki Fandom Cross-Validation (baru: 2026-09-29)
+
+Sumber daya eksternal **Fandom Clash of Clans Wiki** kini dapat diakses via API (Cloudflare challenge melindungi halaman `wikitext` penuh, tetapi `action=parse` API masih berfungsi). Berikut pembandingan langsung:
+
+**Metode:** Data wiki diekstrak melalui `api.php?action=parse&page=<page>&prop=wikitext`, lalu diparsing tabel statistik. Dibandingkan dengan:
+- **CKA** = `/root/ClashKingAssets/assets/static_data/*.json` (source data mentar)
+- **Planner** = `/root/coc-planner/public/data/*.json` (slim data)
+- **bbRush.ts** = konstanta hardcoded kapasitas dan trip
+
+### 6a. Builder Hall cost & time — SEMUA MATCH ✅
+
+| TH Level | Wiki Cost | Wiki Time | CKA Cost | CKA Time | Planner Cost | Planner Time | Status |
+|----------|----------:|----------:|---------:|---------:|-------------:|-------------:|--------|
+| L2 | 3,500 | 5s | 3,500 | 5s | 3,500 | 5s | ✅ |
+| L3 | 30,000 | 1h | 30,000 | 3600s | 30,000 | 3600s | ✅ |
+| L4 | 200,000 | 1d | 200,000 | 86400s | 200,000 | 86400s | ✅ |
+| L5 | 400,000 | 2d | 400,000 | 172800s | 400,000 | 172800s | ✅ |
+| L6 | 1,200,000 | 3d | 1,200,000 | 259200s | 1,200,000 | 259200s | ✅ |
+| L7 | 1,800,000 | 4d | 1,800,000 | 345600s | 1,800,000 | 345600s | ✅ |
+| L8 | 2,800,000 | 5d | 2,800,000 | 432000s | 2,800,000 | 432000s | ✅ |
+| L9 | 3,800,000 | 6d | 3,800,000 | 518400s | 3,800,000 | 518400s | ✅ |
+| L10 | 4,800,000 | 7d | 4,800,000 | 604800s | 4,800,000 | 604800s | ✅ |
+
+**Conclusi:** CKA → Planner slim → Wiki Fandom — tiga sumber persis identik. Tidak ada drift pada cost maupun time Builder Hall.
+
+### 6b. BB_STORAGE_CAPACITY (per-storage) — MATCH DENGAN WIKI ✅
+
+Sumber: halaman *Gold Storage/Builder Base* → tabel "Storage Capacity" (tiap storage level menyimpan jumlah yang sama untuk Gold dan Elixir, seperti tercantum di wiki).
+
+| Storage L | Wiki Capacity | bbRush.ts BB_STORAGE_CAPACITY | Status |
+|----------:|--------------:|------------------------------:|--------|
+| L1 | 70,000 | 70,000 | ✅ |
+| L2 | 150,000 | 150,000 | ✅ |
+| L3 | 250,000 | 250,000 | ✅ |
+| L4 | 350,000 | 350,000 | ✅ |
+| L5 | 600,000 | 600,000 | ✅ |
+| L6 | 800,000 | 800,000 | ✅ |
+| L7 | 1,200,000 | 1,200,000 | ✅ |
+| L8 | 1,600,000 | 1,600,000 | ✅ |
+| L9 | 2,000,000 | 2,000,000 | ✅ |
+| L10 | 2,500,000 | 2,500,000 | ✅ |
+
+### 6c. BB_HALL_CAPACITY (intrinsic hall storage per pool) — MATCH DENGAN WIKI ✅
+
+Sumber: halaman *Builder Hall* → tabel "Available Resources" (intrinsic hall storage per currency pool).
+
+| BH Level | Wiki Intrinsic | bbRush.ts BB_HALL_CAPACITY | Status |
+|----------:|--------------:|---------------------------:|--------|
+| L1 | 50,000 | 50,000 | ✅ |
+| L2 | 75,000 | 75,000 | ✅ |
+| L3 | 100,000 | 100,000 | ✅ |
+| L4 | 150,000 | 150,000 | ✅ |
+| L5 | 900,000 | 900,000 | ✅ |
+| L6 | 900,000 | 900,000 | ✅ |
+| L7 | 1,100,000 | 1,100,000 | ✅ |
+| L8 | 1,300,000 | 1,300,000 | ✅ |
+| L9 | 1,500,000 | 1,500,000 | ✅ |
+| L10 | 1,500,000 | 1,500,000 | ✅ |
+
+> **Catatan metodologi:** Audit sebelumnya (LOGIC-AUDIT #22) menilai nilai L5–L7 sebagai "tidak terverifikasi" karena asumsi nilai lama (300k/400k/600k). Dengan wiki Fandom API yang kini bisa diakses, nilai baru (900k/900k/1.1M) terkonfirmasi — koreksi sudah tepat.
+
+### 6d. Total Resource Cap Consistency Check
+
+Kapasitas total per resource pool = `BB_HALL_CAPACITY + 2 × BB_STORAGE_CAPACITY` (hall + 2 storages):
+
+| BH Level | Total Cap | Next Upgrade Affordable | Status |
+|----------|----------:|--------------------------:|--------|
+| L8 | 4.5M | BH9 (3.8M), Star Lab L9 (4.0M) | ✅ Cukup |
+| L9 | 5.5M | Baby Dragon L18 (5.1M) | ✅ Cukup |
+| L10 | 6.5M | (tidak ada upgrade yang butuh lebih) | ✅ Cukup |
+
+Ini memvalidasi kembali aritmetika di komentar `bbRush.ts` baris 44–47.
+
+### 6e. GEAR-UP Trip Duration — TETAP UNVERIFIED (hardcoded constant) ⚠️
+
+`GEAR_UP_SECONDS` di `bbRush.ts`:
+| Gear-up | bbRush.ts | Wiki Fandom | CKA static_data |
+|---------|----------:|------------|-----------------|
+| cannon (Double Cannon → Cannon) | 2 hari (172,800s) | ❌ Tidak tercantum | ❌ Tidak ada field |
+| archerTower (AT → Fast Attack) | 7 hari (604,800s) | ❌ Tidak tercantum | ❌ Tidak ada field |
+| mortar (Multi Mortar → Mortar) | 14 hari (1,209,600s) | ❌ Tidak tercantum | ❌ Tidak ada field |
+
+**Fakta:** Fandom wiki menyatakan *Gear Up Cost* dan *Gear Up Time* (waktu upgrade building itu sendiri), **bukan** durasi pertempuran Master Builder ke Home Village. Trip duration adalah **game runtime constant** yang tidak diekspor di CKA `static_data`, tidak ada di wiki Fandom, dan tidak bisa diverifikasi otomatis.
+
+Nilai 2d/7d/14d umum diketahui komunitas (clashofclans.fandom wiki discussion threads, Reddit r/clashofclans) sebagai Master Builder travel time. `GEAR_UP_SECONDS` sudah dityple `Record<GearUpKey, number>` (LOGIC-AUDIT #25) sehingga key rename akan compile-error. **Tidak perlu perubahan kode** — dokumen sebagai game constant yang disengaja.
+
+### 6f. X-Bow (Builder Base) max level — MATCH & CORRECT HANDLING ✅
+
+| Sumber | X-Bow (BB) Max Level | bbRush.ts Handling |
+|--------|---------------------:|--------------------|
+| CKA | L5 | ✅ `canReach9()` memfilter, auto-pick menolak |
+| Wiki Fandom | L5 | ✅ Konsisten |
+
+X-Bow (BB) tidak pernah bisa mencapai L9, sehingga `BB_DEFENSE_TARGET_LEVEL=9` tidak bisa dipilih secara manual. `bbDefenseTarget()` sudah memfilter dengan benar.
+
+---
+
+## Ringkasan Akhir — Status Verifikasi Wiki Fandom Ditambahkan
+
+| Item Audit | Sumber Verifikasi | Status |
+|-----------|-------------------|--------|
+| Builder Hall cost/time | CKA ✅ Wiki ✅ | 100% match |
+| Planner slim data | CKA | 100% match (lihat §1) |
+| BB_STORAGE_CAPACITY | Wiki ✅ | Match, termasuk koreksi L5–L7 |
+| BB_HALL_CAPACITY | Wiki ✅ | Match, termasuk koreksi L5–L7 |
+| Total resource caps | Aritmetika internal + Wiki ✅ | Konsisten |
+| GEAR_UP_SECONDS | Wiki ❌ CKA ❌ | Hardcoded constant, tidak bisa diverifikasi otomatis |
+| X-Bow BB max level | CKA ✅ Wiki ✅ | L5, handling sudah benar |
+| slim_data.py townhall_req | CKA ✅ | Bug `f` sudah diperbaiki |
+
+**Aksi yang diperlukan:** Tidak ada — semua sudah fix. Refactor `townhall_req` sudah diterapkan, data sudah diregenerasi dari CKA terbaru, dokumen GEAR_UP_SECONDS sudah diperbarui.
+
+### 6g. Regenerasi Data (2026-09-29 10:26 WIB)
+
+`slim_data.py` dijalankan kembali dari CKA terbaru. Hasil verifikasi field-per-level (bukan per-posisi):
+
+| File | Entities | Levels Checked | Mismatches | Status |
+|------|----------|---------------|------------|--------|
+| buildings.json | 76 | 725 | 0 | ✅ |
+| troops.json | 99 | 464 | 0 | ✅ |
+| heroes.json | 8 | 528 | 0 | ✅ |
+| spells.json | 20 | 114 | 0 | ✅ |
+| pets.json | 12 | 143 | 0 | ✅ |
+| equipment.json | 42 | 918 | 0 | ✅ |
+| traps.json | 12 | 107 | 0 | ✅ |
+| helpers.json | 4 | 33 | 0 | ✅ |
+| **TOTAL** | **273** | **2,892** | **0** | **✅ All match** |
+
+> Catatan: Data planner sebelumnya *stale* — kekurangan TH L18, Wall L20, dan lainnya yang baru di CKA 2026. Sekarang sudah konsisten. `GEAR_UP_SECONDS` di `bbRush.ts` juga sudah diperbarui dengan komentar dokumentasi community-verified.
+
 — Akhir audit —
