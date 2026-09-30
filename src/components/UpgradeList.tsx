@@ -24,6 +24,7 @@ interface Props {
 const CATEGORY_ORDER = [
   "building",
   "trap",
+  "guardian",
   "troop",
   "spell",
   "siege",
@@ -36,6 +37,7 @@ const CATEGORY_ORDER = [
 const CATEGORY_LABELS: Record<string, string> = {
   building: "Buildings",
   trap: "Traps",
+  guardian: "Guardians",
   troop: "Troops",
   spell: "Spells",
   siege: "Siege Machines",

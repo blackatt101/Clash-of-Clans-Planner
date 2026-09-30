@@ -23,6 +23,7 @@ export type Category =
   | "pet"
   | "equipment"
   | "helper"
+  | "guardian"
   | "siege";
 
 export interface OreCost {
@@ -89,6 +90,7 @@ export interface RawExport {
   spells?: RawEntry[];
   pets?: RawEntry[];
   equipment?: RawEntry[];
+  guardians?: RawEntry[];
   buildings2?: RawEntry[];
   traps2?: RawEntry[];
   units2?: RawEntry[];

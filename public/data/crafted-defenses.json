@@ -1,0 +1,1458 @@
+{
+  "items": [
+    {
+      "_id": 103000009,
+      "name": "Air Bombs",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 600,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 620,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1000,
+          "cost": 40000,
+          "time": 28800,
+          "th": 18,
+          "dps": 650,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 1500,
+          "cost": 50000,
+          "time": 36000,
+          "th": 18,
+          "dps": 680,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2000,
+          "cost": 60000,
+          "time": 39600,
+          "th": 18,
+          "dps": 680,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2600,
+          "cost": 70000,
+          "time": 46800,
+          "th": 18,
+          "dps": 710,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3200,
+          "cost": 80000,
+          "time": 54000,
+          "th": 18,
+          "dps": 740,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3800,
+          "cost": 90000,
+          "time": 97200,
+          "th": 18,
+          "dps": 775,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4400,
+          "cost": 100000,
+          "time": 194400,
+          "th": 18,
+          "dps": 820,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 5200,
+          "cost": 110000,
+          "time": 388800,
+          "th": 18,
+          "dps": 880,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 6000,
+          "cost": 120000,
+          "time": 777600,
+          "th": 18,
+          "dps": 950,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": null,
+      "name": "Bomb Hive",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 400,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 324,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 900,
+          "cost": 3000000,
+          "time": 129600,
+          "th": 18,
+          "dps": 378,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 1400,
+          "cost": 3500000,
+          "time": 172800,
+          "th": 18,
+          "dps": 432,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 1900,
+          "cost": 4000000,
+          "time": 216000,
+          "th": 18,
+          "dps": 486,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2400,
+          "cost": 4500000,
+          "time": 223200,
+          "th": 18,
+          "dps": 540,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 2900,
+          "cost": 6000000,
+          "time": 230400,
+          "th": 18,
+          "dps": 594,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3400,
+          "cost": 7500000,
+          "time": 237600,
+          "th": 18,
+          "dps": 648,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 3900,
+          "cost": 9000000,
+          "time": 244800,
+          "th": 18,
+          "dps": 702,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 4400,
+          "cost": 10500000,
+          "time": 252000,
+          "th": 18,
+          "dps": 756,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 4900,
+          "cost": 12000000,
+          "time": 259200,
+          "th": 18,
+          "dps": 810,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": 103000013,
+      "name": "Cake-A-Pult",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 1600,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 195,
+          "explosion_damage": 400,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1800,
+          "cost": 3000000,
+          "time": 14400,
+          "th": 18,
+          "dps": 210,
+          "explosion_damage": 450,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 2150,
+          "cost": 4000000,
+          "time": 21600,
+          "th": 18,
+          "dps": 225,
+          "explosion_damage": 480,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2500,
+          "cost": 5000000,
+          "time": 28800,
+          "th": 18,
+          "dps": 246,
+          "explosion_damage": 510,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2700,
+          "cost": 6000000,
+          "time": 36000,
+          "th": 18,
+          "dps": 264,
+          "explosion_damage": 530,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3150,
+          "cost": 7000000,
+          "time": 57600,
+          "th": 18,
+          "dps": 285,
+          "explosion_damage": 550,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3800,
+          "cost": 8000000,
+          "time": 144000,
+          "th": 18,
+          "dps": 315,
+          "explosion_damage": 600,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4300,
+          "cost": 9000000,
+          "time": 266400,
+          "th": 18,
+          "dps": 333,
+          "explosion_damage": 750,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 4950,
+          "cost": 10000000,
+          "time": 453600,
+          "th": 18,
+          "dps": 354,
+          "explosion_damage": 900,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 5800,
+          "cost": 11000000,
+          "time": 777600,
+          "th": 18,
+          "dps": 375,
+          "explosion_damage": 950,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": null,
+      "name": "Crusher Mortar",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 400,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 195,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 900,
+          "cost": 45000,
+          "time": 43200,
+          "th": 18,
+          "dps": 200,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 1400,
+          "cost": 60000,
+          "time": 57600,
+          "th": 18,
+          "dps": 205,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 1900,
+          "cost": 75000,
+          "time": 72000,
+          "th": 18,
+          "dps": 210,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2400,
+          "cost": 90000,
+          "time": 86400,
+          "th": 18,
+          "dps": 215,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 2900,
+          "cost": 95000,
+          "time": 108000,
+          "th": 18,
+          "dps": 220,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3400,
+          "cost": 100000,
+          "time": 129600,
+          "th": 18,
+          "dps": 225,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 3900,
+          "cost": 105000,
+          "time": 172800,
+          "th": 18,
+          "dps": 230,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 4400,
+          "cost": 110000,
+          "time": 216000,
+          "th": 18,
+          "dps": 235,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 4900,
+          "cost": 115000,
+          "time": 259200,
+          "th": 18,
+          "dps": 240,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": null,
+      "name": "Flame Spinner",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 600,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 220,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1200,
+          "cost": 3000000,
+          "time": 129600,
+          "th": 18,
+          "dps": 240,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 1800,
+          "cost": 3500000,
+          "time": 172800,
+          "th": 18,
+          "dps": 260,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2400,
+          "cost": 4000000,
+          "time": 216000,
+          "th": 18,
+          "dps": 280,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 3000,
+          "cost": 4500000,
+          "time": 223200,
+          "th": 18,
+          "dps": 300,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3600,
+          "cost": 6000000,
+          "time": 230400,
+          "th": 18,
+          "dps": 320,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 4200,
+          "cost": 7500000,
+          "time": 237600,
+          "th": 18,
+          "dps": 340,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4800,
+          "cost": 9000000,
+          "time": 244800,
+          "th": 18,
+          "dps": 360,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 5400,
+          "cost": 10500000,
+          "time": 252000,
+          "th": 18,
+          "dps": 380,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 6000,
+          "cost": 12000000,
+          "time": 259200,
+          "th": 18,
+          "dps": 400,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": null,
+      "name": "Hero Bell",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 400,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 900,
+          "cost": 4000000,
+          "time": 86400,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 1400,
+          "cost": 5000000,
+          "time": 108000,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 1900,
+          "cost": 6000000,
+          "time": 129600,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2400,
+          "cost": 7000000,
+          "time": 151200,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 2900,
+          "cost": 8000000,
+          "time": 172800,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3400,
+          "cost": 9000000,
+          "time": 194400,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 3900,
+          "cost": 10000000,
+          "time": 216000,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 4400,
+          "cost": 11000000,
+          "time": 237600,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 4900,
+          "cost": 12000000,
+          "time": 259200,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": 103000012,
+      "name": "Hero Hunter",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 1600,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 145,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1800,
+          "cost": 40000,
+          "time": 28800,
+          "th": 18,
+          "dps": 155,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 2150,
+          "cost": 50000,
+          "time": 36000,
+          "th": 18,
+          "dps": 170,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2500,
+          "cost": 60000,
+          "time": 39600,
+          "th": 18,
+          "dps": 185,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2700,
+          "cost": 70000,
+          "time": 46800,
+          "th": 18,
+          "dps": 195,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3150,
+          "cost": 80000,
+          "time": 68400,
+          "th": 18,
+          "dps": 210,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3900,
+          "cost": 90000,
+          "time": 165600,
+          "th": 18,
+          "dps": 260,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4400,
+          "cost": 100000,
+          "time": 298800,
+          "th": 18,
+          "dps": 325,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 5200,
+          "cost": 110000,
+          "time": 532800,
+          "th": 18,
+          "dps": 350,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 6000,
+          "cost": 120000,
+          "time": 864000,
+          "th": 18,
+          "dps": 385,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": null,
+      "name": "Hook Tower",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 500,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1000,
+          "cost": 4000000,
+          "time": 86400,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 1500,
+          "cost": 5000000,
+          "time": 108000,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2000,
+          "cost": 6000000,
+          "time": 129600,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2500,
+          "cost": 7000000,
+          "time": 151200,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3000,
+          "cost": 8000000,
+          "time": 172800,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3500,
+          "cost": 9000000,
+          "time": 194400,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4000,
+          "cost": 10000000,
+          "time": 216000,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 4500,
+          "cost": 11000000,
+          "time": 237600,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 5000,
+          "cost": 12000000,
+          "time": 259200,
+          "th": 18,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": 103000011,
+      "name": "Hot Candle",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 1600,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 80,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1800,
+          "cost": 3500000,
+          "time": 21600,
+          "th": 18,
+          "dps": 100,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 2150,
+          "cost": 4500000,
+          "time": 28800,
+          "th": 18,
+          "dps": 120,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2500,
+          "cost": 5500000,
+          "time": 36000,
+          "th": 18,
+          "dps": 150,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2700,
+          "cost": 6500000,
+          "time": 43200,
+          "th": 18,
+          "dps": 160,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3150,
+          "cost": 7500000,
+          "time": 64800,
+          "th": 18,
+          "dps": 180,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3900,
+          "cost": 8500000,
+          "time": 154800,
+          "th": 18,
+          "dps": 190,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4500,
+          "cost": 10000000,
+          "time": 288000,
+          "th": 18,
+          "dps": 210,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 5200,
+          "cost": 11500000,
+          "time": 496800,
+          "th": 18,
+          "dps": 230,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 6000,
+          "cost": 13000000,
+          "time": 820800,
+          "th": 18,
+          "dps": 250,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": 103000010,
+      "name": "Lava Launcher",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 1200,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 80,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1600,
+          "cost": 30000,
+          "time": 14400,
+          "th": 18,
+          "dps": 83,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 2000,
+          "cost": 40000,
+          "time": 21600,
+          "th": 18,
+          "dps": 87,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2400,
+          "cost": 50000,
+          "time": 28800,
+          "th": 18,
+          "dps": 91,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 2800,
+          "cost": 60000,
+          "time": 36000,
+          "th": 18,
+          "dps": 95,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3200,
+          "cost": 70000,
+          "time": 43200,
+          "th": 18,
+          "dps": 99,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 3600,
+          "cost": 80000,
+          "time": 86400,
+          "th": 18,
+          "dps": 104,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4000,
+          "cost": 90000,
+          "time": 172800,
+          "th": 18,
+          "dps": 109,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 4600,
+          "cost": 100000,
+          "time": 345600,
+          "th": 18,
+          "dps": 115,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 5200,
+          "cost": 110000,
+          "time": 691200,
+          "th": 18,
+          "dps": 121,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": null,
+      "name": "Light Beam",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 600,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 132,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1200,
+          "cost": 45000,
+          "time": 43200,
+          "th": 18,
+          "dps": 144,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 1800,
+          "cost": 60000,
+          "time": 57600,
+          "th": 18,
+          "dps": 156,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2400,
+          "cost": 75000,
+          "time": 72000,
+          "th": 18,
+          "dps": 168,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 3000,
+          "cost": 90000,
+          "time": 86400,
+          "th": 18,
+          "dps": 180,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3600,
+          "cost": 95000,
+          "time": 108000,
+          "th": 18,
+          "dps": 192,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 4200,
+          "cost": 100000,
+          "time": 129600,
+          "th": 18,
+          "dps": 204,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4800,
+          "cost": 105000,
+          "time": 172800,
+          "th": 18,
+          "dps": 216,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 5400,
+          "cost": 110000,
+          "time": 216000,
+          "th": 18,
+          "dps": 228,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 6000,
+          "cost": 115000,
+          "time": 259200,
+          "th": 18,
+          "dps": 240,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    },
+    {
+      "_id": 103000008,
+      "name": "Roaster",
+      "village": "home",
+      "type": null,
+      "resource": null,
+      "rarity": null,
+      "hero": null,
+      "flying": false,
+      "levels": [
+        {
+          "l": 1,
+          "hitpoints": 960,
+          "cost": 0,
+          "time": 0,
+          "th": 18,
+          "dps": 50,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 2,
+          "hitpoints": 1500,
+          "cost": 3500000,
+          "time": 21600,
+          "th": 18,
+          "dps": 54,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 3,
+          "hitpoints": 2000,
+          "cost": 4500000,
+          "time": 28800,
+          "th": 18,
+          "dps": 58,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 4,
+          "hitpoints": 2500,
+          "cost": 5500000,
+          "time": 36000,
+          "th": 18,
+          "dps": 62,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 5,
+          "hitpoints": 3000,
+          "cost": 6500000,
+          "time": 43200,
+          "th": 18,
+          "dps": 66,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 6,
+          "hitpoints": 3500,
+          "cost": 7500000,
+          "time": 50400,
+          "th": 18,
+          "dps": 70,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 7,
+          "hitpoints": 4000,
+          "cost": 8500000,
+          "time": 93600,
+          "th": 18,
+          "dps": 75,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 8,
+          "hitpoints": 4500,
+          "cost": 10000000,
+          "time": 187200,
+          "th": 18,
+          "dps": 80,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 9,
+          "hitpoints": 5200,
+          "cost": 11500000,
+          "time": 367200,
+          "th": 18,
+          "dps": 87,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        },
+        {
+          "l": 10,
+          "hitpoints": 6000,
+          "cost": 13000000,
+          "time": 734400,
+          "th": 18,
+          "dps": 95,
+          "lab": null,
+          "bs": null,
+          "ph": null
+        }
+      ]
+    }
+  ]
+}

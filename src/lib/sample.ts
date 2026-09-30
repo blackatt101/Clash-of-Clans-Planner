@@ -23,6 +23,11 @@ export const SAMPLE_EXPORT = JSON.stringify(
     siege_machines: [{ data: 4000051, lvl: 2 }],
     pets: [{ data: 73000000, lvl: 5 }],
     equipment: [{ data: 90000000, lvl: 9 }],
+    // Guardians: TH18-only, defensive companion units
+    guardians: [
+      { data: 107000000, lvl: 2 }, // Longshot
+      { data: 107000001, lvl: 1 }, // Smasher
+    ],
     // The Builder Base half is a real base, not just a Builder Hall: buildings
     // the export does not list read as "not built" there (see `unlockOptions` in
     // upgrade.ts), so a one-building sample would be offered the whole rulebook

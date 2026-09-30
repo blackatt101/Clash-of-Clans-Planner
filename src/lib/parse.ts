@@ -65,6 +65,7 @@ const GROUPS: Group[] = [
   { key: "pets", category: "pet", village: "home" },
   { key: "equipment", category: "equipment", village: "home" },
   { key: "helpers", category: "helper", village: "home" },
+  { key: "guardians", category: "guardian", village: "home" },
   { key: "buildings2", category: "building", village: "builderBase" },
   { key: "traps2", category: "trap", village: "builderBase" },
   { key: "units2", category: "troop", village: "builderBase" },

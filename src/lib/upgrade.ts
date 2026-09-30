@@ -268,6 +268,10 @@ export function entityCategory(
         return "trap";
       case "helpers":
         return "helper";
+      case "guardians":
+        return "guardian";
+      case "crafted-defenses":
+        return "building";
     }
   }
   // Buildings (and anything whose file is unknown): fall back to the type
@@ -371,6 +375,7 @@ function unlockOptions(pv: ParsedVillage, data: GameData): UpgradeOption[] {
       //   which a base without that unit cannot act on.
       if (
         category !== "building" &&
+        category !== "guardian" &&
         !FACILITY_GATES.some(
           (g) =>
             (village === "home" ? g.home?.id : g.builderBase?.id) ===

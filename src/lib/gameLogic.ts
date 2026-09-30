@@ -317,6 +317,7 @@ export function inferVillage(entity: { _id: number; village?: Village }): "home"
   if (id >= 73000000 && id < 74000000) return "home"; // pets
   if (id >= 90000000 && id < 91000000) return "home"; // equipment
   if (id >= 93000000 && id < 94000000) return "home"; // helpers
+  if (id >= 107000000 && id < 108000000) return "home"; // guardians
   return undefined;
 }
 

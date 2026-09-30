@@ -127,6 +127,7 @@ export function groupKey(category: string, entity: SlimEntity | null, isTownHall
   if (category === "pet") return "pet";
   if (category === "troop" || category === "spell" || category === "siege") return "lab";
   if (category === "trap") return "trap";
+  if (category === "guardian") return "defense";
   switch (entity?.type) {
     case "Defense": return "defense";
     case "Army": return "army";
@@ -159,6 +160,7 @@ export function familyOf(
   if (category === "spell") return "spell";
   if (category === "troop" || category === "siege" || category === "pet") return "army";
   if (category === "trap") return "trap";
+  if (category === "guardian") return "defense";
   switch (entity?.type) {
     case "Defense": return "defense";
     case "Army": return "army";

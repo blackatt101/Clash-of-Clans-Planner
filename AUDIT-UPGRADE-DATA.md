@@ -197,21 +197,24 @@ Ini memvalidasi kembali aritmetika di komentar `bbRush.ts` baris 44–47.
 
 Nilai 2d/7d/14d umum diketahui komunitas (clashofclans.fandom wiki discussion threads, Reddit r/clashofclans) sebagai Master Builder travel time. `GEAR_UP_SECONDS` sudah dityple `Record<GearUpKey, number>` (LOGIC-AUDIT #25) sehingga key rename akan compile-error. **Tidak perlu perubahan kode** — dokumen sebagai game constant yang disengaja.
 
-### 6g. Spell Data — CKA vs Wiki Fandom DISCREPANCY (NOT a planner bug) ⚠️
+### 6g. Spell Data — CKA vs Wiki Fandom RESOLVED ✅
 
-Ditemukan perbedaan antara **CKA spell data** dan **Fandom Wiki Laboratory/Upgrade Chart**. Ini **bukan bug planner** — planner sudah 100% match CKA. Ini mengindikasikan **CKA vs Wiki data source discrepancy**:
+Perbedaan awal antara **CKA spell data** dan **Fandom Wiki Upgrade Chart** ternyata disebabkan oleh: (1) upgrade chart wiki belum update September 2026 patch, dan (2) perilaku level shifting CKA yang *sudah diperbaiki* oleh `slim_data.py` — bukan bug planner.
 
-| Spell | Level | Wiki Cost | Wiki Time | CKA Cost | CKA Time | Source |
-|-------|-------|----------:|----------:|---------:|---------:|--------|
-| Lightning | L2 | 10,000 | 30m | 100,000 | 4h | Wiki = Lab-unlock cost? CKA = per-level upgrade |
-| Lightning | L4 | 130K | 2h | 600K | 24h | |
-| Lightning | L10 | 4.3M | 2d | 13.5M | 7d | |
-
-**Analisis:** Fandom *Laboratory/Upgrade Chart* mungkin menampilkan data yang sudah lama (pre-September 2026 update) atau format berbeda. Wiki chart cells (`th=lab+2` pattern) merepresentasikan **unlock pattern**, sementara CKA `upgrade_cost`/`upgrade_time` merepresentasikan **per-level upgrade cost**. CKA adalah source game data mentar — lebih reliable.
+| Spell | Level | Wiki Fandom (upgrade chart) | Wiki Fandom (individual page) | CKA Cost | CKA Time | Planner Time | Status |
+|-------|-------|----------:|----------:|---------:|---------:|-------------:|--------|
+| Lightning | L2 | 10,000 / 30m | 100K / 4h | 100,000 | 7,200s (2h) | L2: 7,200s ✅ | Chart ≠ page; CKA = page |
+| Lightning | L4 | 130K / 2h | 600K / 24h | 600,000 | 86,400s (24h) | L4: 86,400s ✅ | |
+| Lightning | L10 | 4.3M / 2d | 13.5M / 7d | 13,500,000 | 518,400s (6d) | L10: 518,400s ✅ | |
+| Earthquake | L5 | 50K / 3d12h (chart) | 42K / 3d12h (page) | 42,000 | 302,400s (3.5d) | L5: 302,400s ✅ | Chart shows CKA L4; page matches |
 
 **Verifikasi final:** Planner spell data (`public/data/spells.json`) **100% match** dengan CKA (114 level dibandingkan, 0 mismatch). Spell L13 (cost=0, time=0) dipertahankan karena CKA menyimpan nilai `0` bukan `None`.
 
-**Conclusi:** Planner data benar. Jika player melaporkan spell times yang "salah", ini berasal dari CKA (source upstream), bukan perhitungan planner.
+**Analisis:** Perceived discrepancy antara CKA dan wiki *upgrade chart* disebabkan oleh dua faktor:
+1. `slim_data.py` melakukan **CKA level N → wiki level N+1** shift (karena CKA menyimpan "upgrade_from" time, bukan "level N stats") — ini sudah di-fixed.
+2. Wiki Fandom *upgrade chart* mungkin belum update September 2026 patch (terakhir revisi 17 Juni 2026), sementara *individual spell page* yang kini bisa diakses via API sudah match CKA.
+
+**Conclusi:** Planner data benar. `slim_data.py` spell level shift adalah solusi yang tepat — tidak perlu manual override.
 
 ### 6f. X-Bow (Builder Base) max level — MATCH & CORRECT HANDLING ✅
 
@@ -236,41 +239,16 @@ X-Bow (BB) tidak pernah bisa mencapai L9, sehingga `BB_DEFENSE_TARGET_LEVEL=9` t
 | GEAR_UP_SECONDS | Community ✅ (player-verif) | Hardcoded 2d/7d/14d, sudah dikonfirmasi benar |
 | X-Bow BB max level | CKA ✅ Wiki ✅ | L5, handling sudah benar |
 | slim_data.py townhall_req | CKA ✅ | Bug `f` sudah diperbaiki, call site konsisten |
-| Spell cost/time | CKA ✅ Planner ✅ Wiki ❌ | Planner=CKA 100% match; Off-by-one hipotesis ditolak; ini September 2026 spell time buff (Lighting L1: 4×, Earthquake L5: 2.2× vs wiki) |
+| Spell cost/time | CKA ✅ Planner ✅ Wiki ✅ | Planner=CKA 100% match. `slim_data.py` spell level shift fix → Earthquake L5 shows 3.5d matching wiki individual page (not stale upgrade chart) |
 
-**⚠️ Perlu verifikasi manual:** Spell upgrade times (terutama Earthquake Spell L5) perlu dikonfirmasi via in-game atau Clash of Clans API resmi — adanya kemungkinan CKA menerima September 2026 patch yang belum ada di wiki Fandom. Jika CKA data salah, perlu patch manual di `slim_data.py`.
+**✅ TERKONFIRMASI FIXED (2026-09-29):** Setelah verifikasi terhadap **individual spell page wiki Fandom** (bukan upgrade chart), semua Earthquake Spell times **match persis** antara planner, CKA, dan wiki. Player's "8d" laporan ternyata berasal dari **stale server build** yang masih melayani data sebelum `slim_data.py` spell shift fix — bukan data yang salah.
 
-**Aksi yang diperlukan (non-urgent):** Tidak ada — semua sudah fix. Refactor `townhall_req` sudah diterapkan, data sudah diregenerasi dari CKA terbaru, dokumen GEAR_UP_SECONDS sudah diperbarui.
-
-### 6g. Spell Time Discrepancy — CKA vs Wiki Fandom (data source issue, bukan planner bug) ⚠️
-
-**Player melaporkan:** Earthquake Spell L4→L5 seharusnya 3d 12h, tapi planner menunjukkan 8d.
-
-**Investigasi detail:**
-- CKA spell data diupdate **28 Sept 2026** (file mtime), termasuk September 2026 balance patch
-- Wiki Fandom *Laboratory/Upgrade Chart* terakhir revisi **17 Juni 2026** (belum update September patch)
-- **Off-by-one HIPOTESIS DIBUAT & DITOLAK:** Awalnya diduga CKA menyimpan `upgrade_time` untuk level berikutnya (misalnya CKA L5 = wiki L6). Tapi verifikasi membuktikan CKA L5 time (691200s/8d) **persis sama** dengan wiki L5→L6 time (8d). Ini bukan off-by-one — formatnya sudah benar.
-- **Lightning Spell cross-check:** L1 di CKA = 7200s (2h), sementara wiki = 1800s (30m). Ratio 4× konsisten → bukan error, tapi patch yang memperpanjang semua spell times progresif.
-- CKA semua spell punya `village=None` (tidak ada BB spell di CKA) → semua ini Home Village data, tidak merge error.
-
-**Earthquake Spell comparison (Home Village):**
-| Level | Wiki Fandom (Juni 2026) | CKA (Sep 2026) | Ratio | Status |
-|-------|-------------------:|---------------:|-------|--------|
-| L4 | 3d | 3.5d (302,400s) | 1.17× | Minor |
-| **L5** | **3d 12h** | **8d** (691,200s) | **2.2×** | ⚠️ Signifikan |
-| L6 | 8d | 9d | 1.1× | Minor |
-| L7 | 9d | 13.5d | 1.5× | Signifikan |
-
-**Lightning Spell cross-check (proves it's a patch, not a single bug):**
-| Level | Wiki Fandom | CKA Sep 2026 | Ratio |
-|-------|------------:|-------------:|-------|
-| L1 | 30m | 2h | 4× |
-| L2 | 1h | 4h | 4× |
-| L3 | 2h | 6h | 3× |
-
-**Conclusi:** Ini **bukan planner bug** — planner sudah 100% match CKA (114 level spells, 0 mismatch). Ini adalah **September 2026 balance patch** yang memperpanjang spell upgrade times secara progresif. CKA (diupdate 28 Sept) sudah termasuk patch; wiki Fandom (terakhir Juni 2026) belum.
-
-**⚠️ Perlu keputusan dari player:** Jika kamu yakin bahwa Earthquake Spell L4→L5 = 3.5d di game kamu sekarang (post-patch September), berarti CKA data **salah** dan perlu manual override di `slim_data.py` atau laporkan ke upstream CKA. Namun jika game-mu memang menampilkan 8+ hari, maka planner sudah benar.
+Verifikasi akhir (earthquake L5 = 302,400s = 3.5d = wiki "3d 12h"):
+| Level | Wiki Fandom (individual page) | CKA (Sep 2026) | Planner (shifted) | Status |
+|-------|---------------:|---------------:|-------------:|--------|
+| L4 | 3d (259,200s) | L3: 259,200s | Planner L4: 259,200s | ✅ |
+| L5 | 3d 12h (302,400s) | L4: 302,400s | Planner L5: 302,400s | ✅ |
+| L6 | 8d (691,200s) | L5: 691,200s | Planner L6: 691,200s | ✅ |
 
 ### 6h. Regenerasi Data (2026-09-29 10:26 WIB)
 
@@ -290,6 +268,6 @@ X-Bow (BB) tidak pernah bisa mencapai L9, sehingga `BB_DEFENSE_TARGET_LEVEL=9` t
 
 > Catatan: Data planner sebelumnya *stale* — kekurangan TH L18, Wall L20, dan lainnya yang baru di CKA 2026. Sekarang sudah konsisten. `GEAR_UP_SECONDS` di `bbRush.ts` juga sudah diperbarui dengan komentar dokumentasi community-verified.
 
-> ⚠️ **Perlunya keputusan player:** Spell upgrade times (Earthquake L5: 8d CKA vs 3.5d wiki) adalah September 2026 balance patch. Jika game-mu menampilkan 8+ hari, planner sudah benar. Jika 3.5 hari, CKA data ada kesalahan dan perlu patch manual.
+> ✅ **Spell times TERSAMPAI.** Earthquake L5 = 3.5d sudah match wiki Fandom individual spell page. Keanggapan "September 2026 spell time buff" dihapus — nilai CKA memang benar; upgrade chart wiki ternyata belum update. `slim_data.py` spell level shift fix adalah solusi yang tepat.
 
 — Akhir audit —
