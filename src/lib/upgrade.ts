@@ -1,4 +1,4 @@
-import { BB_BOB_CONTROL, BB_HERO_IDS } from "./bbRush";
+import { BB_BOB_CONTROL, BB_HERO_IDS, SIEGE_MACHINE_IDS } from "./bbRush";
 import type { GameData } from "./staticData";
 import type { ParsedEntry, ParsedVillage } from "./parse";
 import type { Cost, Village, Category } from "./types";
@@ -252,6 +252,10 @@ export function entityCategory(
   // Builder Base heroes are heroes in their own file, but their ALTARS are
   // army buildings of the same name — the village disambiguates.
   if (village === "builderBase" && BB_HERO_IDS.includes(entity._id)) return "hero";
+  // Siege machines live in troops.json (fromFile="troops") but queue in the
+  // Siege Workshop, so they must be classified as "siege" before the generic
+  // fromFile fallback lumps them in with lab troops.
+  if (village === "home" && SIEGE_MACHINE_IDS.includes(entity._id)) return "siege";
   if (entity.fromFile) {
     switch (entity.fromFile) {
       case "troops":

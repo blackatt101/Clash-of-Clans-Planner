@@ -9,6 +9,18 @@ export const BB_BUILDER_HALL = 1000034;
 export const BB_CLOCK_TOWER = 1000039;
 export const BB_STAR_LAB = 1000046;
 export const BB_HERO_IDS = [28000003, 28000005]; // Battle Machine, Battle Copter
+/** Home Village siege machine entity IDs — used by entityCategory to classify
+ * them as "siege" rather than "troop" (they live in troops.json but queue in
+ * the Siege Workshop, not the Barracks/Laboratory). */
+export const SIEGE_MACHINE_IDS = [
+  4000051, // Wall Wrecker
+  4000052, // Battle Blimp
+  4000062, // Stone Slammer
+  4000075, // Siege Barracks
+  4000087, // Log Launcher
+  4000091, // Flame Flinger
+  4000092, // Battle Drill
+];
 /** B.O.B Control — the Builder Base building whose own upgrades ARE the tasks. */
 export const BB_BOB_CONTROL = 1000065;
 /** B.O.B's Hut — what appears in the Home Village once the 6th builder is earned. */

@@ -4,7 +4,9 @@ import json, os
 
 SRC = "/root/ClashKingAssets/assets/static_data"
 OUT = "public/data"
-FILES = ["buildings", "troops", "heroes", "spells", "pets", "equipment", "traps", "helpers", "guardians"]
+FILES = ["buildings", "troops", "heroes", "spells", "pets", "equipment", "traps", "helpers", "guardians", "siege-machines"]
+# CDT-specific sources
+CDT = "/root/coc-data-test/data"
 
 
 def cost_of(level):
@@ -75,11 +77,8 @@ def slim_levels_for_spell(it, fname):
     for lv in raw_levels:
         cost = cost_of(lv)
 
-        # skip levels with no cost/time info (purely stat levels, e.g. CKA max level L13 with cost=0/time=0)
+        # skip levels with no cost/time info (purely stat levels)
         if cost is None and time_of(lv) is None:
-            continue
-        # Also skip the trailing CKA "max level" row (cost=0, time=0) — wiki doesn't have it
-        if cost == 0 and time_of(lv) == 0:
             continue
 
         cka_lvl = lv.get("level")
@@ -113,10 +112,6 @@ for f in FILES:
                 cost = cost_of(lv)
                 # skip levels with no cost/time info (purely stat levels)
                 if cost is None and time_of(lv) is None:
-                    continue
-                # Also skip the trailing CKA "max level" row (cost=0, time=0) — wiki doesn't have it
-                # (guardians carry a trailing L5 with cost=0, time=0 in CKA)
-                if cost == 0 and time_of(lv) == 0:
                     continue
                 level_entry = {
                     "l": lv.get("level"),
