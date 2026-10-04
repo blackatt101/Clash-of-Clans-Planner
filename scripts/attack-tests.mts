@@ -29,10 +29,10 @@ t('unknown slug is null', resolveSlug('goblin_warrior_x') === null || resolveSlu
 
 // --- capacities ---
 const c15 = capacitiesForTH(15);
-t('TH15 army housing', c15.armyHousing === 65, String(c15.armyHousing));
-t('TH15 spell housing', c15.spellHousing === 7, String(c15.spellHousing));
-t('TH15 CC troops', c15.ccTroopCapacity === 55, String(c15.ccTroopCapacity));
-t('TH10 army housing', capacitiesForTH(10).armyHousing === 50);
+t('TH15 army housing', c15.armyHousing === 320, String(c15.armyHousing));
+t('TH15 spell housing', c15.spellHousing === 11, String(c15.spellHousing));
+t('TH15 CC troops', c15.ccTroopCapacity === 50, String(c15.ccTroopCapacity));
+t('TH10 army housing', capacitiesForTH(10).armyHousing === 240);
 t('TH3 CC troops', capacitiesForTH(3).ccTroopCapacity === 10);
 t('CC excluded balloon', !isCcEligible('balloon'));
 t('CC excludes valkyrie', !isCcEligible('valkyrie'));
@@ -71,14 +71,14 @@ const r3 = validateStrategy(badCoords, {townHall: 15});
 t('coords clamped', r3.ok && r3.strategy.deployment_plan[1].position.y === 0 && r3.strategy.paths![0].points[1].y === 1, JSON.stringify(r3.errors));
 
 const overflow = JSON.parse(JSON.stringify(base));
-overflow.army.troops = [{id:'dragon',count:50}]; // 50*20=1000 > 65
+overflow.army.troops = [{id:'dragon',count:50}]; // 50*20=1000 > 320
 const r4 = validateStrategy(overflow, {townHall: 15});
 // Capacity overflow is now REPAIRED (trimmed to fit), not fatal:
-// 50 dragons -> 3 dragons (60 housing) fits the 65 cap; one warning recorded.
+// 50 dragons -> 16 dragons (320 housing) fits the 320 cap; one warning recorded.
 t('housing overflow repaired (trimmed to fit)',
   r4.ok && r4.strategy.army.troops.length === 1
-    && r4.strategy.army.troops[0].count === 3
-    && totalHousing(r4.strategy.army.troops) === 60
+    && r4.strategy.army.troops[0].count === 16
+    && totalHousing(r4.strategy.army.troops) === 320
     && r4.warnings.some(w => /trimmed to fit/i.test(w)),
   JSON.stringify({ok:r4.ok, troops:r4.strategy.army.troops, warnings:r4.warnings}));
 
@@ -96,14 +96,14 @@ t('empty deployment rejected', !r6.ok);
 const r7 = validateStrategy({foo: 1}, {townHall: 15});
 t('garbage rejected (no deployments)', !r7.ok);
 
-// CC capacity: 15 miners = 90 > 55 CC capacity at TH15 -> repaired to 9 (54)
+// CC capacity: 15 miners = 90 > 50 CC capacity at TH15 -> repaired to 8 (48)
 const ccBad = JSON.parse(JSON.stringify(base));
 ccBad.army.clan_castle = [{id:'miner', count: 15}];
 const r8 = validateStrategy(ccBad, {townHall: 15});
 t('CC capacity overflow repaired (trimmed to fit)',
   r8.ok && (r8.strategy.army.clan_castle ?? []).length === 1
-    && r8.strategy.army.clan_castle![0].count === 9
-    && totalHousing(r8.strategy.army.clan_castle!) === 54,
+    && r8.strategy.army.clan_castle![0].count === 8
+    && totalHousing(r8.strategy.army.clan_castle!) === 48,
   JSON.stringify({ok:r8.ok, cc:r8.strategy.army.clan_castle, warnings:r8.warnings}));
 
 // CC exclusion: balloons never allowed
@@ -112,7 +112,7 @@ ccBalloon.army.clan_castle = [{id:'balloon', count: 3}];
 const r9 = validateStrategy(ccBalloon, {townHall: 15});
 t('CC balloons excluded & dropped', r9.ok && (r9.strategy.army.clan_castle ?? []).length === 0, JSON.stringify(r9.errors));
 
-// CC valid: 10 miners = 60 > 55 should fail; 8 miners = 48 fits
+// CC valid: 10 miners = 60 > 50 would be trimmed; 8 miners = 48 fits
 const ccOk = JSON.parse(JSON.stringify(base));
 ccOk.army.clan_castle = [{id:'miner', count: 8}];
 const r10 = validateStrategy(ccOk, {townHall: 15});
