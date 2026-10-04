@@ -168,8 +168,9 @@ def gate(lv):
     #
     # NOTE: home heroes carry only `heroHallLevelRequired` (a Hero Hall
     # level, which the app does not model). It is deliberately NOT part of
-    # this chain — home hero rows get their `th` gate from the baseline
-    # instead (see inherit_hero_th).
+    # this chain — home hero rows get their `th` gate by chaining that Hero
+    # Hall level through the Hero Hall building's `townHallRequired`
+    # (see fill_hero_th_from_cdt).
     th = lv.get("townHallRequired", lv.get("builderHallLevelRequired",
            lv.get("builderHallRequired")))
     lab = lv.get("laboratoryRequired", lv.get("starLabRequired"))
@@ -219,30 +220,49 @@ def build_levels(d, out):
     return rows, resource
 
 
-def inherit_hero_th(levels, base):
-    """Home-village heroes: CDT carries no Town Hall gate, only a Hero Hall
-    level the app does not model, so their rows come out with `th=None`.
-    Inherit the TH gate from the baseline, matched on upgrade cost. Cost
-    tiers are stable across data revisions even when the old CKA levels were
-    numbered one behind the CDT in-game levels, so matching on cost (not
-    level number) aligns them. An unmatched cost forward-fills the last
-    seen TH — the gate only ever increases down the chain, so that is the
-    next row's gate."""
-    if not base or not levels:
+def load_hero_hall_th(cdt):
+    """Hero Hall level -> Town Hall level, straight from CDT.
+
+    CDT's home-hero rows carry `heroHallLevelRequired` but no Town Hall
+    gate; the Hero Hall building entity carries the per-level
+    `townHallRequired` that turns a Hero Hall level into its Town Hall.
+    Returns {hh_level: th_level}, or None if the entity is missing."""
+    for d in cdt.get("buildings", []):
+        if d.get("_village") == "home" and norm(d.get("name")) == "herohall":
+            mapping = {}
+            for lv in (d.get("levels") or []):
+                hh, th = lv.get("level"), lv.get("townHallRequired")
+                if hh is not None and th is not None:
+                    mapping[hh] = th
+            return mapping or None
+    return None
+
+
+def fill_hero_th_from_cdt(levels, entity, hh2th):
+    """Set the Town Hall gate on home-hero rows from CDT's own data.
+
+    Each CDT hero level carries `heroHallLevelRequired`; chaining that
+    through the Hero Hall building's per-level `townHallRequired`
+    (``hh2th``) yields the real Town Hall gate. This matches the Fandom
+    wiki's "Town Hall Level Required" column and is self-contained in CDT.
+
+    It replaces the old ``inherit_hero_th`` cost-matching against the CKA
+    baseline, which was numbered one level behind and therefore drifted the
+    gate one Town Hall too late (hero caps came out at 51/31/21 instead of
+    50/30/20). Builder-base heroes are left alone — they already read their
+    ``th`` from CDT's ``builderHallLevelRequired`` via gate().
+    """
+    if not hh2th:
         return
-    c2th = {}
-    for r in base.get("levels", []):
-        c = r.get("cost")
-        if c not in (0, None):
-            c2th[c] = r.get("th")
-    last = None
+    th_by_level = {}
+    for lv in (entity.get("levels") or []):
+        num, hh = lv.get("level"), lv.get("heroHallLevelRequired")
+        if num is not None and hh in hh2th:
+            th_by_level[num] = hh2th[hh]
     for r in levels:
-        c = r.get("cost")
-        if c in c2th:
-            r["th"] = c2th[c]
-            last = c2th[c]
-        elif c not in (0, None) and last is not None:
-            r["th"] = last
+        th = th_by_level.get(r["l"])
+        if th is not None:
+            r["th"] = th
 
 
 def build_crafted_levels(d):
@@ -404,6 +424,9 @@ def wiki_rows(name, village):
 def main():
     baseline = load_baseline()
     cdt = load_cdt()
+    # Hero Hall level -> Town Hall, for recovering home heroes' TH gate from
+    # CDT's own heroHallLevelRequired rows (see fill_hero_th_from_cdt).
+    hh2th = load_hero_hall_th(cdt)
     gap_filled = []
     for out in CATEGORIES:
         items = []
@@ -418,11 +441,13 @@ def main():
             else:
                 levels, resource = build_levels(d, out)
 
-            # Home heroes: CDT carries only a Hero Hall gate, which the app does
-            # not model, so their rows came out with th=None. Recover the real
-            # Town Hall gate from the baseline (matched on upgrade cost).
+            # Home heroes: CDT carries no Town Hall gate, only a Hero Hall
+            # level the app does not model, so build_levels() leaves th=None.
+            # Recover the real Town Hall gate from CDT's own Hero Hall entity
+            # (chained on heroHallLevelRequired) — not from the stale CKA
+            # baseline, which drifted the gate one Town Hall too late.
             if out == "heroes" and village == "home":
-                inherit_hero_th(levels, base)
+                fill_hero_th_from_cdt(levels, d, hh2th)
 
             # Super-troop companion (only in troops): add it as its own entity
             # so the planner keeps the Super <unit> entries it ships today.
