@@ -108,9 +108,9 @@ export default function AIAttackStrategy({ open, onClose, images, onSaved }: AIA
       const url = reader.result as string;
       // Downscale before sending: the AI only needs building-level detail
       // (all plan coordinates are normalized), and full-res phone
-      // screenshots overflow the model's context limit. ~800px keeps
-      // buildings readable while keeping the request small.
-      downscaleImage(url, 512)
+      // screenshots overflow the model's context limit. ~1024px keeps
+      // defenses readable while keeping the request small.
+      downscaleImage(url, 768)
         .then(setDataUrl)
         .catch(() => setDataUrl(url)); // fall back to the original on canvas failure
       setErrorMsg(null);
@@ -658,14 +658,14 @@ function splitList(raw: string): string[] | undefined {
 }
 
 /**
- * Downscale a data-URL image to at most 800px on the long edge and re-encode
+ * Downscale a data-URL image to at most 1024px on the long edge and re-encode
  * as JPEG. Keeps buildings readable (top-down base maps need no fine detail
  * for AI analysis) while keeping the provider request comfortably under the
  * model's context limit. Returns the original on any decode/canvas failure.
  */
 async function downscaleImage(
   dataUrl: string,
-  maxDim = 800,
+  maxDim = 1024,
 ): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image();

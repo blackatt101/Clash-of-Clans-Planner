@@ -236,16 +236,17 @@ function dataUrlToBase64(dataUrlOrBase64: string): string {
 
 /**
  * Server-side safety net: re-encode oversized screenshots to at most
- * 512px on the longest edge (JPEG q85) before they reach the model.
+ * 1024px on the longest edge (JPEG q85) before they reach the model.
  *
  * Why: the provider counts image pixels as tokens, and the gateway's
- * Cloudflare origin times out (~100s) for large images mid-reasoning.
- * 512px keeps every building readable on a top-down base map (all plan
- * coordinates are normalized 0–1, so resolution adds nothing) and keeps
- * the run comfortably fast. No-op for images that are already small or
- * undecodable — those pass through unchanged.
+ * Cloudflare origin times out (~100s) for very large images mid-reasoning.
+ * 1024px keeps building-level detail readable (defense types, pockets,
+ * wall gaps) while a full-res phone capture still gets capped — measured
+ * run times on the Agnes gateway with reasoning_effort=low: 512px ~24s,
+ * 1024px ~49s, so 1024 stays safely under the cap. No-op for images
+ * already at or under the cap, or that are undecodable.
  */
-const MAX_IMAGE_EDGE = 512;
+const MAX_IMAGE_EDGE = 768;
 
 async function prepareScreenshot(screenshot: string): Promise<string> {
   const isDataUrl = screenshot.startsWith("data:");
