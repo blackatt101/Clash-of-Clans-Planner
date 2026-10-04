@@ -6,6 +6,7 @@
 export type ModalKey =
   | "settings"
   | "share"
+  | "attack"
   | "onboarding"
   | "offense"
   | "heroOrder"

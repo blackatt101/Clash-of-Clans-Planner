@@ -8,6 +8,7 @@ interface Props {
   images: Record<string, string>;
   onSettings: () => void;
   onHelp: () => void;
+  onAttack: () => void;
 }
 
 const TABS: { value: Village; label: string; short: string; img: string; fallback: string }[] = [
@@ -21,6 +22,7 @@ export default function Header({
   images,
   onSettings,
   onHelp,
+  onAttack,
 }: Props) {
   const iconBtn =
     "group flex h-9 w-9 items-center justify-center rounded-xl border border-line text-ink-dim transition hover:border-gold/50 hover:text-ink hover:bg-surface-2/60";
@@ -96,6 +98,15 @@ export default function Header({
             })}
           </nav>
 
+          <button
+            onClick={onAttack}
+            className="group relative flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-gold-strong to-gold px-2.5 py-2 text-[13px] font-bold text-[#1a1408] shadow-md shadow-gold/25 transition hover:from-gold hover:to-gold-dim sm:px-3"
+            title="AI Attack Strategy"
+            aria-label="AI Attack Strategy"
+          >
+            <span className="text-base leading-none">⚔</span>
+            <span className="hidden sm:inline">AI Attack</span>
+          </button>
           <button
             onClick={onSettings}
             className={iconBtn}

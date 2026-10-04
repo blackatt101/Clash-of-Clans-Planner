@@ -60,6 +60,7 @@ import ScheduleSettings from "@/components/ScheduleSettings";
 import Schedule from "@/components/Schedule";
 import ShareMenu from "@/components/ShareMenu";
 import Onboarding from "@/components/Onboarding";
+import AIAttackStrategy from "@/components/attack/AIAttackStrategy";
 import OffensePercentages from "@/components/OffensePercentages";
 import PriorityEditor, { type PriorityItem } from "@/components/PriorityEditor";
 import NewUnlockablesNotification from "@/components/NewUnlockablesNotification";
@@ -1166,6 +1167,7 @@ export default function Home() {
         images={gameData?.images ?? {}}
         onSettings={() => pushModal("settings")}
         onHelp={() => pushModal("onboarding")}
+        onAttack={() => pushModal("attack")}
       />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
@@ -1622,6 +1624,13 @@ export default function Home() {
         onCopyLink={copyShareLink}
         onImportSettings={importSettingsInto}
         onResetSettings={resetSettings}
+      />
+
+      <AIAttackStrategy
+        key={modal === "attack" ? "attack-open" : "attack-closed"}
+        open={modal === "attack"}
+        onClose={popModal}
+        images={gameData?.images ?? {}}
       />
 
       <Onboarding
