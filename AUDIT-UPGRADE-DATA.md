@@ -270,4 +270,64 @@ Verifikasi akhir (earthquake L5 = 302,400s = 3.5d = wiki "3d 12h"):
 
 > ✅ **Spell times TERSAMPAI.** Earthquake L5 = 3.5d sudah match wiki Fandom individual spell page. Keanggapan "September 2026 spell time buff" dihapus — nilai CKA memang benar; upgrade chart wiki ternyata belum update. `slim_data.py` spell level shift fix adalah solusi yang tepat.
 
+---
+
+## 7. Kapasitas Attack-Feature (AI Attack Strategy) — CDT vs Wiki Fandom ✅ (2026-10-04)
+
+Audit untuk data yang dipakai fitur **AI Attack Strategy** (`src/lib/attack/catalog.generated.ts`, digenerate dari `coc-data-test`/CDT, **bukan** CKA). Semua kapasitas per-TH di `CAPACITIES` diturunkan dari data bangunan CDT; tabel sumbernya diverifikasi langsung via API Fandom (`action=parse` wikitext).
+
+### 7a. Army Camp (Home Village) — CDT = WIKI ✅
+
+| Camp L | CDT housingSpace | Wiki Troop Capacity | CDT TH req | Wiki TH req | Status |
+|-------:|-----------------:|--------------------:|-----------:|------------:|--------|
+| 1–6 | 20/30/35/40/45/50 | 20/30/35/40/45/50 | 1/2/3/4/5/6 | 1/2/3/4/5/6 | ✅ |
+| 7 | 55 | 55 | 9 | 9 | ✅ |
+| 8 | 60 | 60 | 10 | 10 | ✅ |
+| 9 | 65 | 65 | 11 | 11 | ✅ |
+| 10 | 70 | 70 | 12 | 12 | ✅ |
+| 11 | 75 | 75 | 13 | 13 | ✅ |
+| 12 | 80 | 80 | 15 | 15 | ✅ |
+| 13 | 85 | 85 | 17 | 17 | ✅ |
+| 14 | 88 | 88 | 18 | 18 | ✅ |
+
+Jumlah camp per TH (CDT `availablePerTownHall`): 1 (TH1–2), 2 (TH3–4), 3 (TH5–6), 4 (TH7–18).
+
+### 7b. Spell / Dark Spell Factory storage — CDT = WIKI ✅
+
+| Factory | CDT storage per level | Wiki Spell Capacity | Ketersediaan | Status |
+|---------|----------------------|--------------------:|--------------|--------|
+| Spell Factory L1–L9 | 2/4/6/8/10/10/10/10/10 | 2/4/6/8/10/10/10/10/10 | TH5, 1 unit | ✅ |
+| Dark Spell Factory L1–L8 | 1 (semua level) | 1 (semua level) | TH8, 1 unit | ✅ |
+
+### 7c. Clan Castle troop/spell/siege capacity — CDT = WIKI ✅
+
+Verified pre-compaction: CC L11 = 50/3/1 @ TH15 dan L14 = 55/4/2 @ TH16 — identik dengan tabel wiki. Kapasitas CDT L1–L14:
+
+| CC L | Troop | Spell | Siege | CC L | Troop | Spell | Siege |
+|-----:|------:|------:|------:|-----:|------:|------:|------:|
+| 1 | 10 | 0 | 0 | 8 | 40 | 2 | 1 |
+| 2 | 15 | 0 | 0 | 9 | 45 | 2 | 1 |
+| 3 | 20 | 0 | 0 | 10 | 45 | 3 | 1 |
+| 4 | 25 | 1 | 0 | 11 | 50 | 3 | 1 |
+| 5 | 30 | 1 | 0 | 12 | 50 | 3 | 2 |
+| 6 | 35 | 1 | 1 | 13 | 55 | 3 | 2 |
+| 7 | 35 | 2 | 1 | 14 | 55 | 4 | 2 |
+
+### 7d. Tabel hasil — `CAPACITIES` di catalog.generated.ts (konsistensi internal) ✅
+
+`armyHousing[TH] = campCount(TH) × maxCampLevel(TH).housingSpace`; `spellHousing[TH] = sfCount×sfStorage + dsfCount×dsfStorage`:
+
+| TH | Army | Spell | CC max (troop/spell/siege) | Status |
+|---:|-----:|------:|----------------------------|--------|
+| 1–4 | 20/30/70/80 | 0 | —/—/L1/L2 | ✅ |
+| 5–6 | 135/150 | 2/4 | L2/L3 | ✅ |
+| 7 | 200 | 6 | L3 | ✅ |
+| 8–9 | 200/220 | 7/9 | L4/L5 | ✅ |
+| 10–14 | 240→300 | 11 | L6→L10 | ✅ |
+| 15–18 | 320/320/340/352 | 11 | L11/L12/L13/L14 | ✅ |
+
+Contoh: TH15 = 4 camp × 80 (camp L12) = 320; TH18 = 4 × 88 (camp L14) = 352. Spell TH8 = SF L3(6) + DSF L1(1) = 7; TH10+ = SF(10) + DSF(1) = 11.
+
+**Conclusi:** seluruh kapasitas attack-feature berasal dari CDT dan **match wiki Fandom** (14 level Army Camp, storage SF/DSF, 14 level CC). Tabel hand-typed lama (mis. TH15: 65/7) sudah tidak dipakai — semua dihitung dari data. Tidak ada perubahan kode yang diperlukan.
+
 — Akhir audit —
