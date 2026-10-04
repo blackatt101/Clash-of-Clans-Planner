@@ -22,7 +22,6 @@ import OpenAI, {
   NotFoundError,
   RateLimitError,
 } from "openai";
-import sharp from "sharp";
 import type {
   ChatCompletionMessageParam,
 } from "openai/resources/chat/completions/completions";
@@ -234,47 +233,6 @@ function dataUrlToBase64(dataUrlOrBase64: string): string {
   return dataUrlOrBase64.startsWith("data:") ? dataUrlOrBase64 : `data:image/png;base64,${dataUrlOrBase64}`;
 }
 
-/**
- * Server-side safety net: re-encode oversized screenshots to at most
- * 1024px on the longest edge (JPEG q85) before they reach the model.
- *
- * Why: the provider counts image pixels as tokens, and the gateway's
- * Cloudflare origin times out (~100s) for very large images mid-reasoning.
- * 1024px keeps building-level detail readable (defense types, pockets,
- * wall gaps) while a full-res phone capture still gets capped — measured
- * run times on the Agnes gateway with reasoning_effort=low: 512px ~24s,
- * 1024px ~49s, so 1024 stays safely under the cap. No-op for images
- * already at or under the cap, or that are undecodable.
- */
-const MAX_IMAGE_EDGE = 768;
-
-async function prepareScreenshot(screenshot: string): Promise<string> {
-  const isDataUrl = screenshot.startsWith("data:");
-  const b64 = isDataUrl ? screenshot.slice(screenshot.indexOf(",") + 1) : screenshot;
-  let bytes: Buffer;
-  try {
-    bytes = Buffer.from(b64, "base64");
-  } catch {
-    return screenshot;
-  }
-  // Tiny payloads (icons, small captures) need no work — skip decode.
-  if (bytes.length < 64 * 1024) return screenshot;
-  try {
-    const img = sharp(bytes).rotate();
-    const meta = await img.metadata();
-    const maxEdge = Math.max(meta.width ?? 0, meta.height ?? 0);
-    if (maxEdge <= MAX_IMAGE_EDGE) return screenshot;
-    const resized = await img
-      .resize(MAX_IMAGE_EDGE, MAX_IMAGE_EDGE, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-    return `data:image/jpeg;base64,${resized.toString("base64")}`;
-  } catch {
-    // Undecodable image: send it as-is and let the model/provider decide.
-    return screenshot;
-  }
-}
-
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -428,9 +386,8 @@ export async function generateStrategy(
   ) => { ok: boolean; errors: string[]; strategy: AttackStrategy },
 ): Promise<AiCallResult> {
   const system = buildSystemPrompt(request);
-  // Shrink oversized screenshots before they reach the model (provider
-  // token-counts pixels; big images overflow context / 524 the gateway).
-  const screenshot = await prepareScreenshot(request.screenshot);
+  // Send the screenshot as-is (no re-encoding): the AI sees the full-detail base.
+  const screenshot = request.screenshot;
   const userContent = [
     {
       type: "text" as const,

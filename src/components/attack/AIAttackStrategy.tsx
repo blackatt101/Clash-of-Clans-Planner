@@ -106,13 +106,9 @@ export default function AIAttackStrategy({ open, onClose, images, onSaved }: AIA
     const reader = new FileReader();
     reader.onloadend = () => {
       const url = reader.result as string;
-      // Downscale before sending: the AI only needs building-level detail
-      // (all plan coordinates are normalized), and full-res phone
-      // screenshots overflow the model's context limit. ~1024px keeps
-      // defenses readable while keeping the request small.
-      downscaleImage(url, 768)
-        .then(setDataUrl)
-        .catch(() => setDataUrl(url)); // fall back to the original on canvas failure
+      // Send the screenshot as-is (original resolution, no re-encoding):
+      // the user wants the AI to see the full-detail base map.
+      setDataUrl(url);
       setErrorMsg(null);
     };
     reader.readAsDataURL(f);
@@ -655,33 +651,4 @@ function splitList(raw: string): string[] | undefined {
     .map((p) => p.trim().toLowerCase())
     .filter(Boolean);
   return parts.length ? parts : undefined;
-}
-
-/**
- * Downscale a data-URL image to at most 1024px on the long edge and re-encode
- * as JPEG. Keeps buildings readable (top-down base maps need no fine detail
- * for AI analysis) while keeping the provider request comfortably under the
- * model's context limit. Returns the original on any decode/canvas failure.
- */
-async function downscaleImage(
-  dataUrl: string,
-  maxDim = 1024,
-): Promise<string> {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error("could not decode image"));
-    el.src = dataUrl;
-  });
-  const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
-  if (scale >= 1) return dataUrl; // already small enough
-  const w = Math.max(1, Math.round(img.naturalWidth * scale));
-  const h = Math.max(1, Math.round(img.naturalHeight * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return dataUrl;
-  ctx.drawImage(img, 0, 0, w, h);
-  return canvas.toDataURL("image/jpeg", 0.85);
 }
