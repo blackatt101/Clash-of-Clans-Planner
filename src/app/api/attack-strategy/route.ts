@@ -20,7 +20,7 @@ import type { AttackRequest } from "@/lib/attack/types";
  *         heroLevels?, preferredStyle?, ccTroops?, ccSpells? }
  *
  * The AI key never reaches the browser: this handler is the only place that
- * talks to the gateway. ONE generation request produces the whole plan; the
+ * talks to the OpenAI API. ONE generation request produces the whole plan; the
  * model itself flags unreadable / non-CoC screenshots (cost control: no
  * separate verification call). The strategy is validated and repaired;
  * invalid strategies are rejected with a friendly message.

@@ -33,10 +33,8 @@ const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v
 const OPENAI_KEY = process.env.OPENAI_API_KEY ?? "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4.1";
 /**
- * Optional reasoning budget for reasoning models (e.g. "low"). When a
- * reasoning model thinks for too long, gateway origin timeouts (Cloudflare
- * 524) cut the run; capping the effort keeps image runs fast. Only sent when
- * set — non-reasoning OpenAI models reject an unknown parameter.
+ * Optional reasoning budget for reasoning models (e.g. "low"|"medium"|"high").
+ * Only sent when set — non-reasoning OpenAI models reject an unknown parameter.
  */
 const OPENAI_REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || undefined;
 
@@ -71,7 +69,7 @@ export function buildSystemPrompt(request: AttackRequest): string {
   // The attacker's Town Hall drives the capacities AND which catalog entries
   // are available — so only this level's units/spells/siege reach the model.
   // Lines are kept compact ("slug:<space>"), one token per entry, to hold the
-  // prompt small for fast (less 524-prone) runs — the model already knows what
+  // prompt small and cheap — the model already knows what
   // housing means; the validator is the real enforcement point.
   const caps = capacitiesForTH(request.townHall);
   const maxTroopTH = request.townHall;
@@ -281,9 +279,9 @@ async function callOpenAI(messages: ChatCompletionMessageParam[]): Promise<strin
       res = await client.chat.completions.create({
         model: OPENAI_MODEL,
         messages,
-        // Reasoning budget (e.g. "low") — keeps long-thinking models under
-        // the gateway's origin timeout. Unset by default so non-reasoning
-        // OpenAI models are unaffected.
+        // Reasoning budget (e.g. "low") — bounds how long a reasoning model
+        // thinks. Unset by default so non-reasoning OpenAI models are
+        // unaffected.
         ...(OPENAI_REASONING_EFFORT
           ? {
               reasoning_effort: OPENAI_REASONING_EFFORT as
