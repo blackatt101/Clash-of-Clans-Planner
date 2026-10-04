@@ -290,7 +290,7 @@ Audit untuk data yang dipakai fitur **AI Attack Strategy** (`src/lib/attack/cata
 | 13 | 85 | 85 | 17 | 17 | ✅ |
 | 14 | 88 | 88 | 18 | 18 | ✅ |
 
-Jumlah camp per TH (CDT `availablePerTownHall`): 1 (TH1–2), 2 (TH3–4), 3 (TH5–6), 4 (TH7–18).
+Jumlah camp per TH — CDT `availablePerTownHall`: 1 (TH1–2), 2 (TH3–4), 3 (TH5–6), 4 (TH7–18). **Konfirmasi wiki:** template `NumberAvailable||TH1=1||TH3=2||TH5=3||TH7=4` di *Army Camp/Home Village* — identik. ✅
 
 ### 7b. Spell / Dark Spell Factory storage — CDT = WIKI ✅
 
@@ -298,6 +298,8 @@ Jumlah camp per TH (CDT `availablePerTownHall`): 1 (TH1–2), 2 (TH3–4), 3 (TH
 |---------|----------------------|--------------------:|--------------|--------|
 | Spell Factory L1–L9 | 2/4/6/8/10/10/10/10/10 | 2/4/6/8/10/10/10/10/10 | TH5, 1 unit | ✅ |
 | Dark Spell Factory L1–L8 | 1 (semua level) | 1 (semua level) | TH8, 1 unit | ✅ |
+
+Jumlah pabrik — CDT `availablePerTownHall` vs template `NumberAvailable` wiki: SF = `TH5=1` ✅, DSF = `TH8=1` ✅ (keduanya 0 unit di TH sebelum itu).
 
 ### 7c. Clan Castle troop/spell/siege capacity — CDT = WIKI ✅
 
