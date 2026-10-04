@@ -51,6 +51,16 @@ function spaceOf(slug: string): number {
 }
 
 /**
+ * Town Hall availability: units whose minTH is above the attacker's TH are
+ * dropped (repair policy) so the rendered plan never names equipment the
+ * player cannot have. `minTH === null` (no data) passes.
+ */
+function thAvailable(slug: string, th: number): boolean {
+  const min = resolveEntity(slug)?.ref.minTH;
+  return min == null || min <= th;
+}
+
+/**
  * Repair a capacity overflow by trimming counts in place (never throws —
  * returns void; callers check `totalHousing` afterward if they care).
  * Greedy: decrement the highest-space species first; when every species is
@@ -147,6 +157,10 @@ export function validateStrategy(
       warnings.push(`"${slug}" is not a troop; dropped from army.`);
       continue;
     }
+    if (!thAvailable(slug, constraints.townHall)) {
+      warnings.push(`"${slug}" is not available at TH${constraints.townHall}; dropped.`);
+      continue;
+    }
     if (n <= 0) continue;
     if (seenTroop.has(slug)) {
       troops.find((x) => x.id === slug)!.count += n;
@@ -165,6 +179,10 @@ export function validateStrategy(
       warnings.push(`Unknown spell "${String(s?.id)}" dropped.`);
       continue;
     }
+    if (!thAvailable(slug, constraints.townHall)) {
+      warnings.push(`Spell "${slug}" is not available at TH${constraints.townHall}; dropped.`);
+      continue;
+    }
     if (n <= 0) continue;
     if (seenSpell.has(slug)) {
       spells.find((x) => x.id === slug)!.count += n;
@@ -178,10 +196,10 @@ export function validateStrategy(
   const siegeRaw = rawObj.army?.siege_machine;
   if (siegeRaw?.id) {
     const slug = resolveSlug(siegeRaw.id);
-    if (slug && resolveEntity(slug)?.kind === "siege") {
+    if (slug && resolveEntity(slug)?.kind === "siege" && thAvailable(slug, constraints.townHall)) {
       siege = { id: slug };
     } else {
-      warnings.push(`Unknown siege machine "${String(siegeRaw.id)}" dropped.`);
+      warnings.push(`Unknown or TH-unavailable siege machine "${String(siegeRaw.id)}" dropped.`);
     }
   }
 
@@ -191,6 +209,10 @@ export function validateStrategy(
     const n = intCount(t?.count);
     if (!slug || n <= 0) continue;
     if (resolveEntity(slug)?.kind !== "troop") continue;
+    if (!thAvailable(slug, constraints.townHall)) {
+      warnings.push(`CC troop "${slug}" is not available at TH${constraints.townHall}; dropped.`);
+      continue;
+    }
     if (!isCcEligible(slug)) {
       warnings.push(`"${slug}" cannot be placed in the Clan Castle; dropped.`);
       continue;
@@ -216,6 +238,10 @@ export function validateStrategy(
     const slug = resolveSlug(d?.unit);
     if (!slug) {
       warnings.push(`Deployment step for unknown unit "${String(d?.unit)}" dropped.`);
+      continue;
+    }
+    if (!thAvailable(slug, constraints.townHall)) {
+      warnings.push(`Deployment step for "${slug}" is not available at TH${constraints.townHall}; dropped.`);
       continue;
     }
     const count = intCount(d?.count ?? 1);
@@ -267,7 +293,14 @@ export function validateStrategy(
       trigger: s?.trigger ? String(s.trigger).slice(0, 240) : undefined,
       purpose: s?.purpose ? String(s.purpose).slice(0, 240) : undefined,
     }))
-    .filter((s) => resolveSlug(s.spell) !== null);
+    .filter((s) => {
+      if (resolveSlug(s.spell) === null) return false;
+      if (!thAvailable(s.spell, constraints.townHall)) {
+        warnings.push(`Spell "${s.spell}" in spell_actions not available at TH${constraints.townHall}; dropped.`);
+        return false;
+      }
+      return true;
+    });
   for (const s of asArray(rawObj.spell_actions)) {
     if (!resolveSlug(s?.spell)) warnings.push(`Unknown spell "${String(s?.spell)}" in spell_actions dropped.`);
   }
@@ -279,7 +312,14 @@ export function validateStrategy(
       trigger: String(h?.trigger ?? "").slice(0, 240),
       purpose: h?.purpose ? String(h.purpose).slice(0, 240) : undefined,
     }))
-    .filter((h) => resolveSlug(h.hero) !== null);
+    .filter((h) => {
+      if (resolveSlug(h.hero) === null) return false;
+      if (!thAvailable(h.hero, constraints.townHall)) {
+        warnings.push(`Hero ability for "${h.hero}" not available at TH${constraints.townHall}; dropped.`);
+        return false;
+      }
+      return true;
+    });
 
   // ---- phases ----
   let phaseNo = 0;

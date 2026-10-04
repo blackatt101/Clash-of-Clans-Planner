@@ -118,6 +118,32 @@ ccOk.army.clan_castle = [{id:'miner', count: 8}];
 const r10 = validateStrategy(ccOk, {townHall: 15});
 t('CC valid loadout passes', r10.ok && r10.strategy.army.clan_castle!.length === 1, JSON.stringify(r10.errors));
 
+// --- TH availability gating (validator enforces, not just the prompt) ---
+const thLow = JSON.parse(JSON.stringify(base));
+// root-rider is minTH 15, druid minTH 14: both unavailable at TH8.
+thLow.army.troops = [{id:'root-rider',count:5},{id:'valkyrie',count:5}]; // valkyrie minTH 8 -> kept
+const r11 = validateStrategy(thLow, {townHall: 8});
+t('TH8 drops TH15-only troop, keeps available troop',
+  r11.ok && r11.strategy.army.troops.length === 1 && r11.strategy.army.troops[0].id === 'valkyrie'
+    && r11.strategy.army.troops[0].count === 5,
+  JSON.stringify(r11.strategy.army.troops));
+const thSpell = JSON.parse(JSON.stringify(base));
+thSpell.army.spells = [{id:'totem-spell',count:2},{id:'rage-spell',count:1}]; // totem minTH16, rage minTH7
+const r12 = validateStrategy(thSpell, {townHall: 8});
+t('TH8 drops TH16-only spell, keeps available spell',
+  r12.strategy.army.spells.length === 1 && r12.strategy.army.spells[0].id === 'rage-spell',
+  JSON.stringify(r12.strategy.army.spells));
+const thHero = JSON.parse(JSON.stringify(base));
+thHero.hero_abilities = [{hero:'grand-warden', trigger:'x'}, {hero:'archer-queen', trigger:'x'}]; // GW minTH14
+const r13 = validateStrategy(thHero, {townHall: 8});
+t('TH8 drops unavailable hero ability',
+  r13.strategy.hero_abilities!.length === 1 && r13.strategy.hero_abilities![0].hero === 'archer-queen',
+  JSON.stringify(r13.strategy.hero_abilities));
+const r14 = validateStrategy(base, {townHall: 15});
+t('TH15 keeps root-rider (minTH15) deployment',
+  r14.strategy.deployment_plan.some(d => d.unit === 'root-rider'),
+  JSON.stringify(r14.strategy.deployment_plan.map(d => d.unit)));
+
 // --- geometry (§2/§9) ---
 const vb = {w: 1000, h: 1000};
 t('toVb', JSON.stringify(toVb({x:0.25,y:0.7}, vb)) === '{"x":250,"y":700}');
