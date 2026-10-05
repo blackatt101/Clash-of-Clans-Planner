@@ -35,6 +35,15 @@ export interface UpgradeOption {
    * planner can actually schedule.
    */
   inFlightSeconds?: number;
+  /**
+   * The follow-up steps this item still has at the current TH/BH level, in
+   * order — present only when more than one level is left. `upgrade.ts` fills
+   * it for owned entries so the list can show a `13 → 15` climb and the
+   * scheduler can run one copy's steps back-to-back on a single builder. The
+   * first step (this row) is `currentLevel → nextLevel` and is NOT repeated
+   * here; these are the steps *after* it.
+   */
+  chain?: Array<{ level: number; cost: Cost | null; time: number | null }>;
 }
 
 export function villageLevel(
@@ -549,6 +558,18 @@ export function computeUpgrades(
       }
     }
 
+    // The first row is the item's next step; `chain` carries every step still
+    // reachable at this TH/BH so the list can show the climb (13 → 15) and the
+    // scheduler can run one copy's steps back-to-back on a single builder.
+    const ceiling =
+      villageLevel(pv, e.village) == null
+        ? data.maxLevel(e.entity)
+        : data.maxLevelAt(e.entity, villageLevel(pv, e.village)!);
+    const chain: UpgradeOption["chain"] = [];
+    for (const row of e.entity.levels) {
+      if (row.l > next.l && row.l <= ceiling)
+        chain.push({ level: row.l, cost: row.cost, time: row.time });
+    }
     opts.push({
       uid: e.uid,
       id: e.id,
@@ -564,6 +585,7 @@ export function computeUpgrades(
       available: gate == null,
       count: e.count,
       inFlightSeconds: inFlight ? e.timer : undefined,
+      ...(chain.length ? { chain } : {}),
     });
   }
   return [...opts, ...unlockOptions(pv, data)];

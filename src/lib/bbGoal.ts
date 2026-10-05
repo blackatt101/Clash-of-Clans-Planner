@@ -378,10 +378,16 @@ export function scheduleBobGoal(o: BobGoalOptions): BobGoalResult {
     book(spans, assigned.start, assigned.end);
   };
   for (const ip of o.inProgress) {
-    // An in-flight Star Lab belongs on the lab lane even though page.tsx kinds
-    // it "builder" (category "building"): the troop gate on the in-flight level
-    // must wait for that lane, not a builder lane parked from t=0.
-    if (ip.kind === "lab" || ip.entityId === BB_STAR_LAB) {
+    // A running RESEARCH belongs on the lab lane: it is the facility's own work,
+    // and that lane is where the next research queues behind it. A running
+    // Star LAB UPGRADE does not — the game keeps the facility researching
+    // while the building is constructed, so the Star Lab bar is an ordinary
+    // builder job and the lane stays free for research that is ready now.
+    // (The troop levels that need the Star Lab's NEXT level are held by the
+    // simulation's own gate times, `atLevel`/`readyOf` — those do not move
+    // with this bar; parking it here only delayed research the facility
+    // already unlocked.)
+    if (ip.kind === "lab") {
       place(ip, -1);
       continue;
     }

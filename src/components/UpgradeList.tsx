@@ -149,6 +149,33 @@ export default function UpgradeList({
   const plannedCount = useMemo(() => options.filter((o) => planned.has(o.uid)).length, [options, planned]);
   const remaining = nowMs - nowEpochMs;
 
+  /**
+   * The climb a row stands for: its next step plus every follow-up level the
+   * village can still reach today. The level pill and the time badge read the
+   * whole climb, not just the next step, because ticking the row plans all of
+   * it. A gated row returns null — you can't show a climb you can't start.
+   */
+  const climbOf = (o: UpgradeOption) => {
+    if (!o.chain?.length || !o.available) return null;
+    const steps = [
+      { from: o.currentLevel, to: o.nextLevel, secs: effectiveTime(o, settings) ?? 0 },
+    ];
+    let prev = o.nextLevel;
+    for (const s of o.chain) {
+      steps.push({
+        from: prev,
+        to: s.level,
+        secs: effectiveTime({ ...o, cost: s.cost, time: s.time }, settings) ?? 0,
+      });
+      prev = s.level;
+    }
+    return {
+      end: prev,
+      total: steps.reduce((a, b) => a + b.secs, 0),
+      tooltip: steps.map((st) => `${st.from}→${st.to} (${formatTime(st.secs)})`).join(" · "),
+    };
+  };
+
   return (
     <div>
       {/* Toolbar */}
@@ -239,7 +266,10 @@ export default function UpgradeList({
                 <span className="ml-auto shrink-0 text-xs tabular-nums text-ink-faint">
                   {scheduleable
                     ? formatTime(
-                        items.reduce((sum, o) => sum + (effectiveTime(o, settings) ?? 0), 0),
+                        items.reduce((sum, o) => {
+                          const c = climbOf(o);
+                          return sum + (c ? c.total : effectiveTime(o, settings) ?? 0);
+                        }, 0),
                       )
                     : ""}
                 </span>
@@ -252,6 +282,11 @@ export default function UpgradeList({
                     const isPlanned = planned.has(o.uid);
                     const cost = effectiveCost(o, settings);
                     const time = effectiveTime(o, settings);
+                    // The whole climb the tick plans — the next step plus every
+                    // follow-up level the village can reach — shown on the pill
+                    // and summed into the time badge so the row's number is the
+                    // cost of finishing it, not just of the first step.
+                    const climb = scheduleable ? climbOf(o) : null;
                     const remainingSec = timerByUid.has(o.uid)
                       ? Math.max(0, (timerByUid.get(o.uid) ?? 0) - Math.floor(remaining / 1000))
                       : null;
@@ -298,16 +333,32 @@ export default function UpgradeList({
                           )}
                         </div>
 
-                        <span className="hidden shrink-0 rounded bg-surface-2 px-2 py-0.5 font-mono text-xs tabular-nums text-ink-dim sm:inline">
-                          {o.currentLevel} → {o.nextLevel}
+                        <span
+                          title={
+                            climb
+                              ? `Plans the whole climb to level ${climb.end}: ${climb.tooltip}`
+                              : undefined
+                          }
+                          className={`hidden shrink-0 rounded bg-surface-2 px-2 py-0.5 font-mono text-xs tabular-nums sm:inline ${
+                            climb ? "text-ink" : "text-ink-dim"
+                          }`}
+                        >
+                          {climb ? `${o.currentLevel} → ${climb.end}` : `${o.currentLevel} → ${o.nextLevel}`}
                         </span>
 
                         <span className="shrink-0 tabular-nums">
                           <CostBadge resource={o.resource} cost={cost} />
                         </span>
 
-                        <span className="hidden w-16 shrink-0 text-right text-ink-dim tabular-nums sm:inline">
-                          {UNSCHEDULED.has(cat) ? "instant" : formatTime(time)}
+                        <span
+                          title={
+                            climb ? `Total time for the whole climb: ${climb.tooltip}` : undefined
+                          }
+                          className="hidden w-16 shrink-0 text-right text-ink-dim tabular-nums sm:inline"
+                        >
+                          {UNSCHEDULED.has(cat)
+                            ? "instant"
+                            : formatTime(climb ? climb.total : time)}
                         </span>
 
                         {remainingSec != null ? (

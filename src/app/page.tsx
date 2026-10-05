@@ -800,6 +800,8 @@ export default function Home() {
           const group = groupKey(o.category, entity, isTh);
           return {
             uid: o.uid,
+            id: o.id,
+            resource: o.resource,
             name: o.name,
             duration: effectiveTime(o, settings) ?? 0,
             category: o.category,
@@ -808,6 +810,25 @@ export default function Home() {
             // its own upgrade, so the schedule expands this into `count` jobs.
             count: o.count,
             family: familyOf(o.category, entity, isTh),
+            // The climb past this row's next step, priced by the same helpers
+            // the head row uses, so every bar of a copy's 13 → 15 reads the
+            // player's own discount numbers. `from` is the level the step
+            // starts from — the row's own step is `currentLevel → nextLevel`,
+            // and the chain carries only what comes after it. Heroes are
+            // exempt: their climb belongs to the hero-lane fill (or the B.O.B
+            // chain in the Base), which owns the levels the ticked list cannot
+            // name — chaining them onto a plain builder lane would answer a
+            // different question than the ticked list does.
+            chain:
+              o.chain?.length && o.category !== "hero"
+                ? o.chain.map((s, i, arr) => ({
+                    from: i === 0 ? o.nextLevel : arr[i - 1].level,
+                    level: s.level,
+                    cost: s.cost,
+                    time:
+                      effectiveTime({ ...o, cost: s.cost, time: s.time }, settings) ?? 0,
+                  }))
+                : undefined,
             priority:
               priorityFor(strategy, o.category, isTh, settings.offenseBeforeTh) +
               labPriorityBoost(settings.labPriority, settings.labOrder, o.category, entity) +

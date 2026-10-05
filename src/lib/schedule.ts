@@ -6,7 +6,7 @@ import {
   type UnavailableWindow,
 } from "./sleep";
 import type { HeroChain } from "./settings";
-import type { Cost, Family, Village } from "./types";
+import type { Category, Cost, Family, Village } from "./types";
 import type { UpgradeOption } from "./upgrade";
 
 export type JobKind = "builder" | "lab" | "pet";
@@ -19,6 +19,15 @@ export type JobKind = "builder" | "lab" | "pet";
  * label between them.
  */
 export const HERO_CHAIN_UID_BASE = 4_000_000;
+
+/**
+ * Follow-up levels of a copy that runs back-to-back on the builder that just
+ * finished its first level get their own uid space the way hero lanes do — one
+ * item is scheduled many times over, and every chained level needs an identity
+ * of its own. 5M is the next free block: 1M is live timers, 2M the B.O.B
+ * chain, 3M unlock options, 4M hero lanes.
+ */
+export const COPY_CHAIN_UID_BASE = 5_000_000;
 
 /** One level a hero on a lane of its own still has to climb. */
 export interface HeroChainLevel {
@@ -84,6 +93,23 @@ export interface ScheduleJob {
    * B.O.B goal planner reads it to know which entry is busy and until when.
    */
   entityId?: number;
+  /**
+   * The game entity this job upgrades, for jobs that carry a `chain`: the
+   * follow-up uids are a deterministic function of the entity id and the level,
+   * and the detail rows the scheduler fabricates look the image up by it.
+   */
+  id?: number;
+  /** The resource the item's levels are paid in — the chain's detail rows show a cost. */
+  resource?: string;
+  /**
+   * The follow-up levels this copy still has to climb, in order. Present when
+   * the caller plans the item's FULL climb at the current TH/BH rather than
+   * only its next level. The first step is the job itself; each entry is a
+   * step from `from` to `level`. `cost` and `time` are already priced by the
+   * same discount helpers as the head step, so the bars and the cost summary
+   * read the same numbers on every level of the climb.
+   */
+  chain?: Array<{ from: number; level: number; cost: Cost | null; time: number }>;
 }
 
 export interface AssignedJob extends ScheduleJob {
@@ -434,11 +460,72 @@ export function scheduleJobs(
     return a;
   };
 
+  /**
+   * Detail rows for the jobs the schedule made that no upgrade list offered:
+   * the chained copy levels and the chained hero levels. The views look every
+   * job up in one shared map by uid, so without these a follow-up's bar has no
+   * name, no level and no cost.
+   */
+  const chainOptions: UpgradeOption[] = [];
+
+  /**
+   * The follow-up levels of a copy, run back-to-back on the lane the head
+   * landed on. A physical copy's 13→14 and 14→15 must not split across
+   * builders — the player finishes the first on one builder and taps the
+   * next — so the whole climb stays on that one lane, each step starting
+   * right after the previous (the login buffer and sleep-window settlement
+   * apply, exactly as for any upgrade) and booking the lane as it goes so
+   * the lane picker sees the builder as busy. Sibling copies keep their
+   * independence: their heads pick lanes as usual and run in parallel.
+   */
+  const placeWithChain = (
+    job: Instance,
+    start: number,
+    lane: AssignedJob[],
+    spans: Span[],
+  ) => {
+    let placed = place(job, start, lane, spans);
+    for (const step of job.chain ?? []) {
+      const uid = COPY_CHAIN_UID_BASE + (job.id ?? 0) * 1000 + step.level;
+      const followUp: Instance = {
+        ...job,
+        uid,
+        key: `${uid}#${job.instance - 1}`,
+        count: 1,
+        duration: step.time,
+        // Start no earlier than the previous step ends; `startIn` settles that
+        // into a real slot (buffered, out of sleep windows) on this lane.
+        after: placed.end,
+        levelFrom: step.from,
+        levelTo: step.level,
+        chain: undefined,
+      };
+      placed = place(followUp, startIn(followUp, spans), lane, spans);
+      chainOptions.push({
+        uid,
+        id: job.id ?? 0,
+        name: job.name,
+        category: job.category as Category,
+        village: opts.village ?? "home",
+        resource: job.resource ?? "Resource",
+        // Track the level the lane just placed, not `step.from - 1`: a caller
+        // may have skipped a level, and the head's own step sits before the
+        // first chain entry.
+        currentLevel: step.from,
+        nextLevel: step.level,
+        cost: step.cost,
+        time: step.time,
+        available: true,
+        count: 1,
+      });
+    }
+  };
+
   for (const j of labJobs) {
-    place(j, startIn(j, labSpans), labLane, labSpans);
+    placeWithChain(j, startIn(j, labSpans), labLane, labSpans);
   }
   for (const j of petJobs) {
-    place(j, startIn(j, petSpans), petLane, petSpans);
+    placeWithChain(j, startIn(j, petSpans), petLane, petSpans);
   }
 
   // Everything that is not a focused hero, on the lanes that are not hero lanes.
@@ -464,7 +551,7 @@ export function scheduleJobs(
         best = s;
       }
     }
-    place(j, best, builderLanes[bi], laneSpans[bi]);
+    placeWithChain(j, best, builderLanes[bi], laneSpans[bi]);
   }
 
   /**
@@ -489,7 +576,6 @@ export function scheduleJobs(
    * Note the lanes are placed after the builder jobs, so a hero cannot delay
    * anything that was already scheduled: it fills what is left.
    */
-  const chainOptions: UpgradeOption[] = [];
   if (heroLaneCount > 0) {
     // "The rest of the plan" is the work that is not a hero — buildings,
     // research, pets — wherever it landed. A hero without a lane of its own is
