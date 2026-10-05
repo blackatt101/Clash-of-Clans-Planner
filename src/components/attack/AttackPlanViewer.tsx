@@ -251,6 +251,10 @@ export default function AttackPlanViewer({
   }, [strategy.deployment_plan]);
 
   const step = focusedStep >= 0 ? strategy.deployment_plan[focusedStep] : null;
+  const nextStep =
+    focusedStep >= 0 && focusedStep + 1 < strategy.deployment_plan.length
+      ? strategy.deployment_plan[focusedStep + 1]
+      : null;
   const stepUnitName = step ? (resolveEntity(step.unit)?.ref.name ?? step.unit) : null;
 
   const btn =
@@ -382,6 +386,20 @@ export default function AttackPlanViewer({
             {" — "}
             {step.purpose ?? `Phase: ${step.phase}.`}
           </div>
+          {nextStep ? (
+            <div className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-ink-faint">
+              Next (step {nextStep.step}): deploy{" "}
+              <b className="text-ink-dim">
+                {nextStep.count}×{" "}
+                {resolveEntity(nextStep.unit)?.ref.name ?? nextStep.unit}
+              </b>
+              {nextStep.target ? ` toward ${nextStep.target}` : ""}
+            </div>
+          ) : (
+            <div className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-ink-faint">
+              Final step — attack, then clean up leftovers.
+            </div>
+          )}
           <div className="mt-1 text-[11px] text-ink-faint">
             Deploys at {Math.round(step.position.x * 100)}% from left, {Math.round(step.position.y * 100)}% from top.
             Drag the ① marker on the map to adjust; double-click path points to remove them.

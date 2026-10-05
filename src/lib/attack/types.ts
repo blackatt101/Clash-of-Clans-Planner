@@ -58,6 +58,13 @@ export interface TroopPath {
   points: Point[];
   /** Rendering hint; defaults to a solid arrow. */
   style?: "attack" | "funnel" | "cleanup";
+  /**
+   * 1-based deployment_plan step this route belongs to. Drives the
+   * step-by-step reveal: the path is hidden until its step is current.
+   * Optional for backward compatibility (older plans fall back to
+   * unit matching; unmatched paths show in "All steps" only).
+   */
+  step?: number;
 }
 
 export interface SpellAction {
@@ -66,6 +73,12 @@ export interface SpellAction {
   /** Event-based trigger, e.g. "When the Hybrid reaches the core." */
   trigger?: string;
   purpose?: string;
+  /**
+   * 1-based deployment_plan step at which this spell is cast. The spell
+   * circle is hidden until that step is current. Optional for backward
+   * compatibility (older plans show spells in "All steps" only).
+   */
+  step?: number;
 }
 
 export interface HeroAbility {

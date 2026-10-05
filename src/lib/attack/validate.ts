@@ -11,6 +11,11 @@
  *  - housing/spell/CC capacity overflow -> trim counts to fit the capacity
  *    (greedy, highest-space species first; whole species only dropped when
  *    not even one fits), recorded as warnings. Plans always come out valid.
+ *  - a troop group split into consecutive steps ("5 miners" then
+ *    "10 miners") -> merged into ONE step, so the plan renders a single
+ *    "Miner ×15" marker instead of a swarm of icons
+ *  - paths / spell actions -> carry the 1-based deployment step they
+ *    belong to (out-of-range references are dropped, not trusted)
  */
 import {
   resolveEntity,
@@ -232,8 +237,16 @@ export function validateStrategy(
   const phaseNames = new Set(
     asArray(rawObj.attack_phases).map((p) => String(p?.name ?? "")).filter(Boolean),
   );
-  const deployment_plan: DeploymentStep[] = [];
-  let stepNo = 0;
+  interface RawStep {
+    phase: string;
+    unit: string;
+    count: number;
+    position: Point;
+    target?: string;
+    purpose?: string;
+    deployments?: { count: number; position: Point; label?: string }[];
+  }
+  const rawSteps: RawStep[] = [];
   for (const d of asArray(rawObj.deployment_plan)) {
     const slug = resolveSlug(d?.unit);
     if (!slug) {
@@ -253,11 +266,11 @@ export function validateStrategy(
         label: s?.label ? String(s.label).slice(0, 40) : undefined,
       }))
       .filter((s) => s.count > 0);
-    const phase = String(d?.phase ?? "").slice(0, 60) || "main";
+    // Phases are normalized (lowercase) so the same phase named
+    // slightly differently still merges below.
+    const phase = String(d?.phase ?? "").trim().toLowerCase().slice(0, 60) || "main";
     if (!phaseNames.has(phase)) phaseNames.add(phase);
-    stepNo += 1;
-    deployment_plan.push({
-      step: stepNo,
+    rawSteps.push({
       phase,
       unit: slug,
       count,
@@ -267,9 +280,55 @@ export function validateStrategy(
       deployments: deployments.length ? deployments : undefined,
     });
   }
+
+  // One marker per troop GROUP: a group the model split into
+  // consecutive steps ("5 miners" then "10 miners", same phase)
+  // is merged — counts sum, split deployments concatenate, the
+  // first step's position/target/purpose wins. Non-adjacent or
+  // different-phase steps are never merged. `stepRemap` maps each
+  // INPUT step number (1-based) to its OUTPUT step number, so paths
+  // and spells that reference the model's numbering still land on
+  // the right step after the merge.
+  const merged: RawStep[] = [];
+  const stepRemap: number[] = [];
+  rawSteps.forEach((s, i) => {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.unit === s.unit && prev.phase === s.phase) {
+      prev.count += s.count;
+      if (s.deployments?.length) {
+        prev.deployments = [...(prev.deployments ?? []), ...s.deployments];
+      }
+      stepRemap[i + 1] = merged.length; // same output step as prev
+      return;
+    }
+    merged.push({ ...s, deployments: s.deployments ? [...s.deployments] : undefined });
+    stepRemap[i + 1] = merged.length;
+  });
+  if (merged.length < rawSteps.length) {
+    warnings.push(
+      `${rawSteps.length - merged.length} consecutive deployment step(s) merged into one marker.`,
+    );
+  }
+
+  const deployment_plan: DeploymentStep[] = merged.map((s, i) => ({
+    step: i + 1,
+    ...s,
+  }));
   if (deployment_plan.length === 0) {
     errors.push("Deployment plan is empty — at least one deployment is required.");
   }
+
+  // Paths / spells reference the 1-based step they belong to, in the
+  // MODEL's numbering — remapped through the merge above. Out-of-range
+  // references are dropped (never trusted) — the overlay then falls
+  // back to attribution by unit, or shows the element in "All steps"
+  // only.
+  const stepRef = (v: unknown): number | undefined => {
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n) || n < 1 || n > rawSteps.length) return undefined;
+    const mapped = stepRemap[n];
+    return mapped >= 1 && mapped <= deployment_plan.length ? mapped : undefined;
+  };
 
   // ---- paths ----
   const paths = asArray(rawObj.paths)
@@ -277,6 +336,7 @@ export function validateStrategy(
       unit: String(p?.unit ?? ""),
       points: (asArray(p?.points) as Raw[]).map((pt) => clampPoint(pt)),
       style: p?.style === "funnel" || p?.style === "cleanup" ? p.style : ("attack" as const),
+      step: stepRef(p?.step),
     }))
     .filter((p) => p.unit && p.points.length >= 2);
   for (const p of asArray(rawObj.paths)) {
@@ -292,6 +352,7 @@ export function validateStrategy(
       position: clampPoint(s?.position),
       trigger: s?.trigger ? String(s.trigger).slice(0, 240) : undefined,
       purpose: s?.purpose ? String(s.purpose).slice(0, 240) : undefined,
+      step: stepRef(s?.step),
     }))
     .filter((s) => {
       if (resolveSlug(s.spell) === null) return false;

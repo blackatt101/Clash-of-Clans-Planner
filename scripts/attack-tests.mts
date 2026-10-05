@@ -5,7 +5,8 @@
  */
 import { resolveEntity, resolveSlug, capacitiesForTH, totalHousing, isCcEligible } from "../src/lib/attack/catalog";
 import { validateStrategy, clampPoint } from "../src/lib/attack/validate";
-import { pathD, arrowHead, toVb } from "../src/lib/attack/geometry";
+import { arrowHead, pathD, placeLabels, rectsOverlap, simplifyPath, toVb, type PlacedLabel, type Rect } from "../src/lib/attack/geometry";
+import { pathStepIndex, spellStepIndex, stepVis, isRendered, VIS_OPACITY } from "../src/lib/attack/steps";
 
 let pass = 0, fail = 0;
 const t = (name: string, cond: boolean, extra = '') => {
@@ -149,6 +150,140 @@ const vb = {w: 1000, h: 1000};
 t('toVb', JSON.stringify(toVb({x:0.25,y:0.7}, vb)) === '{"x":250,"y":700}');
 t('pathD', pathD([{x:0,y:0},{x:0.5,y:0.5}], vb) === 'M 0.0 0.0 L 500.0 500.0');
 t('arrowHead has 4 points', arrowHead([{x:0.5,y:0.9},{x:0.5,y:0.3}], vb, 35).split(' ').length === 4);
+
+// --- troop grouping: one marker per group, not a swarm of icons ---
+const split = JSON.parse(JSON.stringify(base));
+split.deployment_plan = [
+  {step:1, phase:'funnel', unit:'miner', count:5, position:{x:0.3,y:0.7}},
+  {step:2, phase:'funnel', unit:'miner', count:10, position:{x:0.35,y:0.72}},
+  {step:3, phase:'main', unit:'hog-rider', count:10, position:{x:0.5,y:0.9}},
+];
+const r15 = validateStrategy(split, {townHall: 15});
+t('consecutive same-unit steps merged into one "Miner ×15" marker',
+  r15.ok && r15.strategy.deployment_plan.length === 2
+    && r15.strategy.deployment_plan[0].unit === 'miner'
+    && r15.strategy.deployment_plan[0].count === 15,
+  JSON.stringify(r15.strategy.deployment_plan.map(d => [d.unit, d.count])));
+
+const splitPhase = JSON.parse(JSON.stringify(base));
+splitPhase.deployment_plan = [
+  {step:1, phase:'funnel', unit:'miner', count:5, position:{x:0.3,y:0.7}},
+  {step:2, phase:'cleanup', unit:'miner', count:10, position:{x:0.8,y:0.3}},
+];
+const r16 = validateStrategy(splitPhase, {townHall: 15});
+t('same unit in a different phase stays a separate step',
+  r16.ok && r16.strategy.deployment_plan.length === 2
+    && r16.strategy.deployment_plan[0].phase === 'funnel'
+    && r16.strategy.deployment_plan[1].phase === 'cleanup',
+  JSON.stringify(r16.strategy.deployment_plan.map(d => d.phase)));
+
+// split deployments of one merged group concatenate
+const splitDeps = JSON.parse(JSON.stringify(base));
+splitDeps.deployment_plan = [
+  {step:1, phase:'main', unit:'wizard', count:3, position:{x:0.3,y:0.7},
+   deployments:[{count:3, position:{x:0.3,y:0.7}, label:'SW'}]},
+  {step:2, phase:'main', unit:'wizard', count:4, position:{x:0.6,y:0.6},
+   deployments:[{count:4, position:{x:0.6,y:0.6}, label:'NE'}]},
+];
+const r17 = validateStrategy(splitDeps, {townHall: 15});
+t('merged group keeps both split deployments',
+  r17.ok && r17.strategy.deployment_plan.length === 1
+    && r17.strategy.deployment_plan[0].count === 7
+    && (r17.strategy.deployment_plan[0].deployments ?? []).length === 2,
+  JSON.stringify(r17.strategy.deployment_plan[0]?.deployments));
+
+// --- step references on paths and spells ---
+const withSteps = JSON.parse(JSON.stringify(base));
+withSteps.paths = [
+  {step: 1, unit: 'archer-queen', points: [{x:0.2,y:0.8},{x:0.5,y:0.5}]},
+  {step: 99, unit: 'root-rider', points: [{x:0.3,y:0.7},{x:0.6,y:0.6}]},
+  {unit: 'archer-queen', points: [{x:0.5,y:0.9},{x:0.5,y:0.4}]},
+];
+withSteps.spell_actions = [
+  {step: 2, spell: 'healing-spell', position: {x:0.4,y:0.5}},
+  {step: 0, spell: 'rage-spell', position: {x:0.5,y:0.5}},
+];
+const r18 = validateStrategy(withSteps, {townHall: 15});
+t('valid path step passed through', r18.strategy.paths![0].step === 1);
+t('out-of-range path step dropped (never trusted)', r18.strategy.paths![1].step === undefined);
+t('valid spell step passed through', r18.strategy.spell_actions![0].step === 2);
+t('invalid spell step dropped', r18.strategy.spell_actions![1].step === undefined);
+
+// --- step attribution (the reveal rules) ---
+const deps18 = r18.strategy.deployment_plan;
+t('path attributed by explicit step', pathStepIndex(r18.strategy.paths![0], deps18) === 0);
+t('out-of-range path falls back to unit match',
+  pathStepIndex(r18.strategy.paths![1], deps18) === 1);
+t('path without step attributed by unit match',
+  pathStepIndex(r18.strategy.paths![2], deps18) === 0);
+t('named-group path attributes to the nearest step (its deployment point)',
+  pathStepIndex({unit: 'hybrid', points: [{x:0.5,y:0.9},{x:0.5,y:0.4}]}, deps18) === 1);
+t('path with empty plan is overview-only',
+  pathStepIndex({unit: 'hybrid', points: [{x:0.5,y:0.9},{x:0.5,y:0.4}]}, []) === null);
+t('spell attributed by explicit step', spellStepIndex(r18.strategy.spell_actions![0], deps18) === 1);
+t('spell without step estimates the nearest marker',
+  spellStepIndex({spell:'rage-spell', position:{x:0.5,y:0.5}}, deps18) === 1);
+t('spell with empty plan is overview-only',
+  spellStepIndex({spell:'rage-spell', position:{x:0.5,y:0.5}}, []) === null);
+t('spell attributed by trigger text (display name)',
+  spellStepIndex({spell:'rage-spell', position:{x:0.5,y:0.5}, trigger:'When the Archer Queen walks'}, deps18) === 0);
+t('spell attributed by trigger text (single token)',
+  spellStepIndex({spell:'rage-spell', position:{x:0.5,y:0.5}, trigger:'When the Queen is under fire'}, deps18) === 0);
+t('spell attributed by nearest path beats nearest marker',
+  spellStepIndex({spell:'healing-spell', position:{x:0.5,y:0.5}}, deps18, r18.strategy.paths!) === 0);
+t('spell without trigger or paths estimates the nearest marker',
+  spellStepIndex({spell:'healing-spell', position:{x:0.5,y:0.5}}, deps18, []) === 1);
+
+// --- step visibility states ---
+t('stepVis done/current/future',
+  stepVis(0, 1) === 'done' && stepVis(1, 1) === 'current' && stepVis(2, 1) === 'future');
+t('stepVis all-steps mode', stepVis(2, -1) === 'all');
+t('future steps are hidden, done subdued',
+  !isRendered('future') && VIS_OPACITY.future === 0 && VIS_OPACITY.done === 0.35);
+
+// --- geometry: path simplification (meaningful waypoints only) ---
+const straight = [{x:0,y:0},{x:0.25,y:0.25},{x:0.5,y:0.5},{x:0.75,y:0.75},{x:1,y:1}];
+t('simplifyPath reduces a straight line to its endpoints',
+  simplifyPath(straight, 0.01).length === 2);
+const bendy = [{x:0,y:0},{x:0.1,y:0.05},{x:0.2,y:0.1},{x:0.3,y:0.3},{x:0.5,y:0.5}];
+const bendySimple = simplifyPath(bendy, 0.02);
+t('simplifyPath keeps endpoints of a bent path',
+  bendySimple[0].x === 0 && bendySimple[bendySimple.length - 1].x === 0.5);
+t('simplifyPath drops near-collinear waypoints',
+  bendySimple.length < bendy.length, JSON.stringify(bendySimple));
+
+// --- geometry: deterministic label placement ---
+const crowded = [
+  {key:'a', anchor:{x:0.2,y:0.2}, text:'Archer Queen', fontSize:26, anchorRadius:60},
+  {key:'b', anchor:{x:0.24,y:0.22}, text:'Miner ×15', fontSize:26, anchorRadius:60},
+  {key:'c', anchor:{x:0.19,y:0.25}, text:'Hog Rider ×10', fontSize:26, anchorRadius:60},
+  {key:'d', anchor:{x:0.22,y:0.18}, text:'Healer ×5', fontSize:26, anchorRadius:60},
+  {key:'e', anchor:{x:0.21,y:0.23}, text:'Wall Breaker ×8', fontSize:26, anchorRadius:60},
+];
+const crowdObstacles: Rect[] = crowded.map(c => ({
+  x: c.anchor.x * 1000 - c.anchorRadius,
+  y: c.anchor.y * 1000 - c.anchorRadius,
+  w: c.anchorRadius * 2, h: c.anchorRadius * 2,
+}));
+const placed = placeLabels(crowded, crowdObstacles, vb);
+const boxOf = (p: PlacedLabel): Rect => ({x: p.cx - p.w / 2, y: p.cy - p.h / 2, w: p.w, h: p.h});
+t('placeLabels places every label', placed.length === crowded.length);
+let labelOverlap = false;
+for (let i = 0; i < placed.length; i++)
+  for (let j = i + 1; j < placed.length; j++)
+    if (rectsOverlap(boxOf(placed[i]), boxOf(placed[j]))) labelOverlap = true;
+t('placed labels never overlap each other', !labelOverlap);
+let markerCovered = false;
+for (const p of placed) for (const o of crowdObstacles)
+  if (rectsOverlap(boxOf(p), o)) markerCovered = true;
+t('placed labels never cover a marker', !markerCovered);
+t('labels stay inside the viewBox',
+  placed.every(p => p.cx - p.w / 2 >= 0 && p.cx + p.w / 2 <= 1000
+    && p.cy - p.h / 2 >= 0 && p.cy + p.h / 2 <= 1000));
+// determinism: same input -> same output
+const placedAgain = placeLabels(crowded, crowdObstacles, vb);
+t('label placement is deterministic',
+  JSON.stringify(placedAgain.map(p => [p.cx, p.cy])) === JSON.stringify(placed.map(p => [p.cx, p.cy])));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

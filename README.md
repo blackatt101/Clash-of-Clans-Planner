@@ -50,6 +50,33 @@ import panel uses.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## AI Attack Strategy Generator
+
+Upload an enemy base screenshot, confirm your Town Hall, and the app asks the
+AI (server-side, one model, one request per plan) to draft a base-specific
+attack plan: strategy + why, army (troops/spells/siege/CC troops), deployment
+steps, troop paths, spell placements, hero abilities and phases. The result
+renders as an interactive SVG overlay on top of your screenshot (the base is
+never redrawn), with step-by-step playback, zoom/pan, marker editing, and PNG
+export. The structured strategy JSON is the single source of truth; the
+overlay is a programmatic rendering of it — no AI-generated imagery.
+
+* Entry point: the gold **AI Attack** button in the header.
+* Backend: `src/app/api/attack-strategy/route.ts` (validates + repairs the
+  model output before it reaches the UI).
+* Frontend: `src/components/attack/` (`AIAttackStrategy`, `AttackPlanViewer`,
+  `AttackOverlay`, `AttackLegend`).
+* Game catalog: `src/lib/attack/` (types, validator, geometry, icon mapping,
+  export). The slug→Supercell-ID catalog in
+  `src/lib/attack/catalog.generated.ts` is regenerated with
+  `node scripts/gen_attack_catalog.mjs` (reads the `coc-data-test` dataset).
+* Configuration: `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_BASE_URL` in
+  `.env.local` (see `.env.example`). The key is never exposed to the browser.
+* Tests: `npm run test:attack` (slug resolution, capacities, coordinate
+  clamping, validator reject/repair rules, step attribution) plus
+  `npx tsx scripts/attack-render-check.mts` (renders the real overlay
+  at every step: reveal rules, label/marker overlap, determinism).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
