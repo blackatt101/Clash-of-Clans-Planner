@@ -45,7 +45,9 @@ function Entry({ entry, images }: { entry: ArmyEntry; images: Record<string, str
 }
 
 export function AttackArmyPanel({ strategy, images }: AttackArmyPanelProps) {
-  const army = strategy.army;
+  // Share links / localStorage restores skip the validator, so the
+  // army block can be absent — render empty rather than crash.
+  const army = strategy.army ?? { troops: [], spells: [] };
   const heroes = (strategy.heroes ?? []).filter((h) => h.use);
   const hasHeroes = heroes.length > 0;
 

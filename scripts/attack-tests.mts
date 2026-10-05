@@ -6,7 +6,7 @@
 import { resolveEntity, resolveSlug, capacitiesForTH, totalHousing, isCcEligible } from "../src/lib/attack/catalog";
 import { validateStrategy, clampPoint } from "../src/lib/attack/validate";
 import { resolveStrategyId, strategyById, strategyMinTH, STRATEGIES } from "../src/lib/attack/strategies";
-import { arrowHead, pathD, placeLabels, rectsOverlap, simplifyPath, toVb, type PlacedLabel, type Rect } from "../src/lib/attack/geometry";
+import { arrowHead, pathD, placeLabels, rectsOverlap, simplifyPath, simplifyPathIndexed, toVb, type PlacedLabel, type Rect } from "../src/lib/attack/geometry";
 import { pathStepIndex, spellStepIndex, stepVis, isRendered, VIS_OPACITY } from "../src/lib/attack/steps";
 
 let pass = 0, fail = 0;
@@ -252,6 +252,29 @@ t('simplifyPath keeps endpoints of a bent path',
   bendySimple[0].x === 0 && bendySimple[bendySimple.length - 1].x === 0.5);
 t('simplifyPath drops near-collinear waypoints',
   bendySimple.length < bendy.length, JSON.stringify(bendySimple));
+
+// Regression: the overlay used to pass viewBox-unit epsilon (vb.w * 0.015
+// ≈ 15) to points in normalized space (max deviation √2), so every route
+// with 5+ waypoints collapsed to a straight line. Epsilon must be
+// normalized — and the surviving original indices must be reported,
+// because the viewer edits the unsimplified point array on drag/remove.
+const zigzag = [
+  {x:0.5,y:0.92},{x:0.52,y:0.85},{x:0.55,y:0.78},{x:0.53,y:0.7},
+  {x:0.5,y:0.6},{x:0.48,y:0.5},
+];
+const sm = simplifyPathIndexed(zigzag, 0.015);
+t('normalized epsilon keeps intermediate waypoints (no straight-line collapse)',
+  sm.points.length > 2, JSON.stringify(sm.points));
+t('simplifyPathIndexed reports original indices for kept points',
+  sm.indices.length === sm.points.length &&
+    sm.indices[0] === 0 &&
+    sm.indices[sm.indices.length - 1] === zigzag.length - 1 &&
+    sm.indices.every((idx, k) => sm.points[k] === zigzag[idx]));
+t('simplifyPathIndexed short-circuits small paths with identity indices',
+  (() => {
+    const r = simplifyPathIndexed([{x:0,y:0},{x:1,y:1}], 0.015);
+    return r.indices.length === 2 && r.indices[1] === 1;
+  })());
 
 // --- geometry: deterministic label placement ---
 const crowded = [

@@ -81,7 +81,23 @@ export function labelAnchor(p: Point): "start" | "middle" | "end" {
  * keep AI-drawn paths to their meaningful waypoints.
  */
 export function simplifyPath(points: Point[], epsilon: number): Point[] {
-  if (points.length <= 2 || epsilon <= 0) return points;
+  return simplifyPathIndexed(points, epsilon).points;
+}
+
+/**
+ * `simplifyPath`, but also reports which original indices survived.
+ * Callers render the simplified polyline yet edit the original
+ * point array (drag / remove a waypoint), so every rendered dot
+ * must dispatch its source index, not its position in the
+ * simplified list.
+ */
+export function simplifyPathIndexed(
+  points: Point[],
+  epsilon: number,
+): { points: Point[]; indices: number[] } {
+  if (points.length <= 2 || epsilon <= 0) {
+    return { points, indices: points.map((_, i) => i) };
+  }
   const keep = new Array<boolean>(points.length).fill(false);
   keep[0] = keep[points.length - 1] = true;
   const stack: [number, number][] = [[0, points.length - 1]];
@@ -111,7 +127,15 @@ export function simplifyPath(points: Point[], epsilon: number): Point[] {
       stack.push([a, maxI], [maxI, b]);
     }
   }
-  return points.filter((_, i) => keep[i]);
+  const kept: Point[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i < points.length; i++) {
+    if (keep[i]) {
+      kept.push(points[i]);
+      indices.push(i);
+    }
+  }
+  return { points: kept, indices };
 }
 
 /* ------------------------------------------------------------------------ */

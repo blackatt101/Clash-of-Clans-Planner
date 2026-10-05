@@ -199,21 +199,22 @@ export default function AttackPlanViewer({
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  // Playback.
+  // Playback. The stop check lives in the interval callback — an
+  // async boundary, unlike the effect body (which the compiler
+  // extension bars synchronous setState from) or the state updater
+  // (which must stay pure; React may invoke it more than once).
   const stepCount = strategy.deployment_plan.length;
   useEffect(() => {
     if (!playing || stepCount === 0) return;
     const id = setInterval(() => {
-      setActiveStep((s) => {
-        if (s + 1 > stepCount - 1) {
-          setPlaying(false);
-          return stepCount - 1;
-        }
-        return s + 1;
-      });
+      if (activeStep >= stepCount - 1) {
+        setPlaying(false);
+        return;
+      }
+      setActiveStep(activeStep + 1);
     }, 2200);
     return () => clearInterval(id);
-  }, [playing, stepCount]);
+  }, [playing, activeStep, stepCount]);
 
   const zoomBy = useCallback((f: number) => setZoom((z) => Math.min(6, Math.max(0.5, z * f))), []);
   const resetView = useCallback(() => {
@@ -394,7 +395,7 @@ export default function AttackPlanViewer({
         <div className="surface-panel card-lit rounded-xl p-3 text-sm">
           <span className="font-semibold capitalize text-gold">{activePhase}:</span>{" "}
           <span className="text-ink-dim">
-            {strategy.attack_phases.find((p) => p.name.toLowerCase() === activePhase.toLowerCase())?.description ??
+            {strategy.attack_phases?.find((p) => p.name.toLowerCase() === activePhase.toLowerCase())?.description ??
               "Highlighted markers and paths belong to this phase; everything else is dimmed."}
           </span>
         </div>

@@ -47,7 +47,7 @@ import {
   labelAnchor,
   pathD,
   placeLabels,
-  simplifyPath,
+  simplifyPathIndexed,
   toVb,
   type LabelRequest,
   type PlacedLabel,
@@ -159,7 +159,7 @@ export default function AttackOverlay(props: OverlayProps) {
       m.set(slug, ent ? images[String(ent.ref.dataId)] ?? null : null);
     };
     for (const s of steps) add(s.unit);
-    for (const t of strategy.army.troops) add(t.id);
+    for (const t of strategy.army?.troops ?? []) add(t.id);
     for (const p of paths) add(p.unit);
     for (const s of spells) add(s.spell);
     return m;
@@ -198,6 +198,9 @@ export default function AttackOverlay(props: OverlayProps) {
       if (activeStep >= 0) return 0;
       return activePhase === null ? 1 : 0.5;
     }
+    // The phase filter dims routes and spell areas exactly like the
+    // markers and labels of non-matching phases (stepOp above).
+    if (activePhase !== null && !isActive(steps[si].phase)) return 0.12;
     return VIS_OPACITY[stepVis(si, activeStep)];
   };
 
@@ -457,10 +460,13 @@ export default function AttackOverlay(props: OverlayProps) {
         const weight = PATH_WEIGHTS[pathRole(p.style)];
         const color =
           si != null ? groupColor(si) : ROUTE_DEFAULT;
-        const pts =
+        // Epsilon is in the points' own (normalized) space: 0.015 is
+        // 1.5% of the base width, matching the dot/dash sizes below.
+        const sm =
           p.points.length > 4
-            ? simplifyPath(p.points, vb.w * 0.015)
-            : p.points;
+            ? simplifyPathIndexed(p.points, 0.015)
+            : { points: p.points, indices: p.points.map((_, i) => i) };
+        const pts = sm.points;
         const d = pathD(pts, vb);
         const head = arrowHead(pts, vb, vb.w * weight.arrow);
         return (
@@ -488,11 +494,14 @@ export default function AttackOverlay(props: OverlayProps) {
                   style={{ cursor: "grab" }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
-                    drag({ pathIndex: pi, pointIndex: j });
+                    // Dispatch the ORIGINAL point index: `pts` is the
+                    // simplified polyline, but the viewer edits
+                    // strategy.paths[pi].points.
+                    drag({ pathIndex: pi, pointIndex: sm.indices[j] });
                   }}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
-                    if (pts.length > 2) onPathPointRemove(pi, j);
+                    if (sm.indices.length > 2) onPathPointRemove(pi, sm.indices[j]);
                   }}
                 />
               );
