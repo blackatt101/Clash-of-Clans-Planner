@@ -87,6 +87,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       strategy: result.strategy,
       attempts: result.attempts,
+      // Validator repairs and selection-audit notes (trimmed
+      // loadouts, dropped units, doubts about the pick) so the
+      // user can see what the planner fixed or questions.
+      warnings: result.warnings,
     });
   } catch (e) {
     // The model flagged the image as not being a readable CoC base.

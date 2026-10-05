@@ -27,6 +27,7 @@ import type {
 } from "openai/resources/chat/completions/completions";
 import { HEROES, SIEGE, SPELLS, TROOPS } from "./catalog.generated";
 import { capacitiesForTH, heroBattlefieldLimit } from "./catalog";
+import { STRATEGIES } from "./strategies";
 import type { AttackRequest, AttackStrategy } from "./types";
 
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
@@ -143,19 +144,23 @@ export function buildSystemPrompt(request: AttackRequest): string {
     "they target next, what could pull them off-route, where is a funnel mandatory, where might",
     "the army split. Record the reasoning in pathingNotes. Every deployment position must serve",
     "this path — never place markers for visual balance.",
-    "5. CANDIDATE STRATEGIES — name 2–4 attacks that are actually available at YOUR Town Hall",
-    "(e.g. queen-charge hybrid, queen-charge / blizzard Lalo, Lavaloon, Super Archer Blimp,",
-    "Hydra, E-Drag, Zap Dragons, GoWiBo, Witch Smash, Root Rider, Valkyrie-based). Never force",
-    "a strategy your Town Hall cannot field, and never default to one popular attack.",
+    "5. CANDIDATE STRATEGIES — name 2–4 attacks from the STRATEGIES list below (use their",
+    "ids, e.g. \"queen-charge-hybrid\"), all actually available at YOUR Town Hall. When the",
+    "base makes both viable, include at least one air and one ground option so the",
+    "comparison is real. Never default to one popular attack.",
     "6. COMPARE — judge each candidate against THIS base: base compatibility, pathing",
     "reliability, defensive-threat matchup, entry difficulty, funnel feasibility, hero",
     "requirements, spell-sequence feasibility, failure risk (pathing/timing) and execution",
     "difficulty. Record strengths, weaknesses and a fit_score per candidate in",
-    "candidate_strategies. A simple reliable attack beats a complicated fragile one — optimize",
-    "base fit, reliability, pathing, defensive matchup and execution feasibility, not complexity.",
+    "candidate_strategies. fit_score is the verdict of this comparison — a 0..1 number",
+    "that must reflect the dimensions above, not effort or popularity. A simple reliable",
+    "attack beats a complicated fragile one — optimize base fit, reliability, pathing,",
+    "defensive matchup and execution feasibility, not complexity.",
     "7. SELECT — pick the candidate with the strongest overall fit: exactly one entry in",
-    "candidate_strategies has selected:true and its id matches strategy.type. Two different",
-    "bases must not automatically receive the same strategy.",
+    "candidate_strategies has selected:true, its id matches strategy.type, and it MUST be",
+    "the candidate with the highest fit_score — if you believe a lower-scoring candidate",
+    "is the better attack, fix the scores, not the selection. Two different bases must",
+    "not automatically receive the same strategy.",
     "8. HEROES — evaluate every hero YOUR Town Hall unlocks (HERO EVALUATION below).",
     "9. SPELLS & SIEGE — choose the spells and the ONE siege machine the selected strategy",
     "actually needs; every spell and the siege machine carry a purpose tied to a real attack",
@@ -183,6 +188,8 @@ export function buildSystemPrompt(request: AttackRequest): string {
     `SIEGE MACHINES: ${sieges.join(", ") || "(none available)"}`,
     `HEROES: ${heroes.join(", ")}`,
     "Do not use troops, spells, heroes or siege machines that are unavailable for your Town Hall.",
+    `STRATEGIES (the candidate ids — use these): ${STRATEGIES.filter((s) => s.minTH <= request.townHall).map((s) => `${s.id} = ${s.name}, TH${s.minTH}+ (${s.tags.join("/")})`).join("; ")}`,
+    "Only name strategies available at YOUR Town Hall; candidates it cannot field are dropped.",
     "Siege machine at most one. Balloons/Valkyrie/Lava Hound and supers cannot be stored in the",
     "enemy Clan Castle, so the clan_castle list only contains CC-eligible regular troops.",
     "",
@@ -316,6 +323,10 @@ export interface AiCallResult {
   valid: boolean;
   /** Validation error strings when !valid (fatal issues). */
   errors: string[];
+  /** Low-severity repairs and selection-audit notes from the
+   *  validator (loadouts trimmed, units dropped, doubts about
+   *  the pick) — surfaced to the user as planner notes. */
+  warnings: string[];
 }
 
 function dataUrlToBase64(dataUrlOrBase64: string): string {
@@ -472,7 +483,7 @@ export async function generateStrategy(
   validate: (
     raw: unknown,
     constraints: { townHall: number },
-  ) => { ok: boolean; errors: string[]; strategy: AttackStrategy },
+  ) => { ok: boolean; errors: string[]; warnings: string[]; strategy: AttackStrategy },
 ): Promise<AiCallResult> {
   const system = buildSystemPrompt(request);
   // Send the screenshot as-is (no re-encoding): the AI sees the full-detail base.
@@ -532,13 +543,13 @@ export async function generateStrategy(
     }
     const result = validate(raw, { townHall: request.townHall });
     if (result.ok) {
-      return { strategy: result.strategy, raw, attempts: attempt, valid: true, errors: [] };
+      return { strategy: result.strategy, raw, attempts: attempt, valid: true, errors: [], warnings: result.warnings };
     }
     lastError = result.errors.join("; ").slice(0, 1500);
     if (attempt === 2) {
       // Final attempt failed: hand back the (repaired-but-invalid) strategy
       // with its errors so the route can reject with a friendly message.
-      return { strategy: result.strategy, raw, attempts: attempt, valid: false, errors: result.errors };
+      return { strategy: result.strategy, raw, attempts: attempt, valid: false, errors: result.errors, warnings: result.warnings };
     }
   }
   throw new MalformedOutputError("AI generation failed after retries.");

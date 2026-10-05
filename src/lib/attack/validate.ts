@@ -24,12 +24,21 @@
  *    from TH7: TH9=2, TH11=3, TH13=4, TH15=5) are enforced —
  *    extras are excluded with the limit as their reason, and
  *    their deployment steps / paths / abilities are dropped
- *  - candidate strategies -> normalized, deduped, capped at 6;
- *    exactly one selected (first wins when the model marks
- *    none or several); rejected entries get a reason
+ *  - candidate strategies -> resolved against the canonical
+ *    strategy catalog (naming variants collapse onto one
+ *    entry, unknown ids kept as free-form), gated by the
+ *    ATTACKER's Town Hall, capped at 6; exactly one
+ *    selected — the candidate matching strategy.type wins
+ *    (the plan serves it) — and warned when the fit scores
+ *    don't back the pick
  *  - army / siege / CC entries -> carry an optional purpose
  *  - base analysis -> structural traits, key defenses and
  *    pathing notes parsed with the same slice/cap policy
+ *  - selection audit -> deterministic cross-checks of the
+ *    picked strategy's tags against the reported base
+ *    (air-defense threat vs a ground-only pick, blimp vs
+ *    high-threat Air Defenses, hero-led pick with no hero
+ *    deployed)
  */
 import {
   heroBattlefieldLimit,
@@ -39,6 +48,12 @@ import {
   isCcEligible,
 } from "./catalog";
 import { HEROES } from "./catalog.generated";
+import {
+  normalizeStrategyId,
+  resolveStrategyId,
+  strategyById,
+  strategyMinTH,
+} from "./strategies";
 import type {
   ArmyConstraints,
   AttackStrategy,
@@ -137,6 +152,63 @@ function asArray(v: unknown): Raw[] {
 }
 
 /**
+ * True when a defense type string names an Air Defense
+ * ("air_defense", "Air Defense", "airdef"…).
+ */
+function isAirDefenseType(type: string): boolean {
+  const n = type.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return n === "airdefense" || n === "airdef" || n.includes("airdefense");
+}
+
+/**
+ * Deterministic second opinion on the selection: cross-checks
+ * the picked strategy's capability tags against the base
+ * analysis the model itself reported. Findings are warnings —
+ * the plan stays valid, but the user sees where the pick and
+ * the base disagree (the model's own evidence contradicts it).
+ */
+function auditSelection(strategy: AttackStrategy, warnings: string[]): void {
+  const def = strategyById(strategy.strategy.type ?? "");
+  if (!def) return;
+  const ba = strategy.base_analysis ?? {};
+  const threats: Array<{ type: string; level?: string }> = [
+    ...(ba.keyDefenses ?? []).map((d) => ({ type: d.type, level: d.threat })),
+    ...(ba.importantTargets ?? []).map((t) => ({
+      type: t.type,
+      level: t.priority,
+    })),
+  ];
+  const airThreat = threats.some(
+    (d) => isAirDefenseType(d.type) && (d.level === "high" || d.level === "medium"),
+  );
+  const airThreatHigh = threats.some(
+    (d) => isAirDefenseType(d.type) && d.level === "high",
+  );
+  // A ground-only army cannot damage Air Defenses at all: they
+  // fire on it all attack long, so a base where they are a key
+  // threat needs an air wing (or a blimp) in the plan.
+  const hasAir = def.tags.some((t) => t === "air" || t === "hybrid" || t === "blimp");
+  if (airThreat && !hasAir) {
+    warnings.push(
+      `Selection audit: Air Defenses are among this base's key threats, but ${def.name} is a ground-only attack — they will fire on the army all attack long.`,
+    );
+  }
+  if (def.tags.includes("blimp") && airThreatHigh) {
+    warnings.push(
+      `Selection audit: an Air Defense is a high threat and ${def.name} depends on a Battle Blimp — the troops inside it may not survive to fire.`,
+    );
+  }
+  if (
+    def.tags.includes("hero-led") &&
+    (strategy.heroes ?? []).filter((h) => h.use).length === 0
+  ) {
+    warnings.push(
+      `Selection audit: ${def.name} is a hero-led attack, but no hero is deployed — the charge that anchors it is missing.`,
+    );
+  }
+}
+
+/**
  * @returns { strategy, repaired } where repaired lists the low-severity
  * fixes made. `strategy` is safe to render when `ok` is true.
  */
@@ -166,21 +238,41 @@ export function validateStrategy(
   if (!strategy.reason) warnings.push("Strategy is missing a rationale.");
 
   // ---- candidate strategies (the comparison behind the pick) ----
-  // Strategy slugs are free-form (not catalog units), so they are
-  // normalized as text, deduped and capped at 6. Exactly one entry
-  // may be selected; a list without a pick marks the first as the
-  // chosen one so the UI always has a selection to highlight.
+  // Ids resolve against the canonical strategy catalog so naming
+  // variants ("GoWiPe", "go wi pe") collapse onto one entry;
+  // unknown ids pass through as free-form (flagged). Candidates
+  // the attacker's Town Hall cannot field are dropped, exactly
+  // like units. Exactly one entry may be selected; a list
+  // without a pick marks the first as the chosen one so the UI
+  // always has a selection to highlight.
   const candidates: CandidateStrategy[] = [];
   const seenCand = new Set<string>();
   for (const c of asArray(rawObj.candidate_strategies)) {
-    const id = String(c?.id ?? "")
+    const rawId = String(c?.id ?? "")
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-")
       .slice(0, 60);
-    if (!id || seenCand.has(id)) continue;
+    if (!rawId) continue;
+    const canonical = resolveStrategyId(rawId);
+    const id = canonical ?? rawId;
+    if (seenCand.has(id)) continue;
     seenCand.add(id);
+    if (!canonical) {
+      warnings.push(
+        `Strategy candidate "${rawId}" is not a known attack; kept as a free-form entry.`,
+      );
+    }
+    // Catalog strategies are gated by Town Hall like units: a
+    // TH8 army cannot field a Super Archer Blimp.
+    const minTH = strategyMinTH(id);
+    if (minTH != null && minTH > constraints.townHall) {
+      warnings.push(
+        `Strategy "${id}" needs TH${minTH}+ and is not available at TH${constraints.townHall}; dropped.`,
+      );
+      continue;
+    }
     candidates.push({
       id,
       name: String(c?.name ?? "").trim().slice(0, 60) || id,
@@ -206,6 +298,11 @@ export function validateStrategy(
     );
     candidates.length = 6;
   }
+  if (candidates.length === 1) {
+    warnings.push(
+      "Only 1 candidate strategy was compared — a real selection weighs at least two options.",
+    );
+  }
   const firstSelected = candidates.findIndex((c) => c.selected);
   if (candidates.length && firstSelected === -1) {
     candidates[0].selected = true;
@@ -220,6 +317,32 @@ export function validateStrategy(
       });
       warnings.push(
         `${extras + 1} candidate strategies were marked selected; only the first counts.`,
+      );
+    }
+  }
+  // The plan's army, deployment and paths all serve
+  // strategy.type, so when a candidate matches strategy.type
+  // that candidate IS the pick — re-mark it selected when the
+  // model flagged a different entry, so the comparison and
+  // the plan cannot disagree.
+  if (strategy.type && candidates.length) {
+    const stratId = normalizeStrategyId(strategy.type);
+    const typeIdx = candidates.findIndex((c) => {
+      const cid = normalizeStrategyId(c.id);
+      return (
+        cid === stratId ||
+        (cid.length >= 4 &&
+          stratId.length >= 4 &&
+          (cid.includes(stratId) || stratId.includes(cid)))
+      );
+    });
+    if (typeIdx >= 0 && !candidates[typeIdx].selected) {
+      candidates.forEach((c) => {
+        c.selected = false;
+      });
+      candidates[typeIdx].selected = true;
+      warnings.push(
+        `The plan serves strategy.type "${strategy.type}", so candidate "${candidates[typeIdx].id}" is the selected one (the model marked a different entry).`,
       );
     }
   }
@@ -240,13 +363,31 @@ export function validateStrategy(
         `strategy.type was missing; backfilled from the selected candidate ("${picked.id}").`,
       );
     } else {
-      const norm = (s: string) =>
-        s.trim().toLowerCase().replace(/\s+/g, "-").replace(/-+/g, "-");
       const candId = picked.id;
-      const stratId = norm(strategy.type);
-      if (candId !== stratId && !candId.includes(stratId) && !stratId.includes(candId)) {
+      const stratId = normalizeStrategyId(strategy.type);
+      if (
+        candId !== stratId &&
+        !candId.includes(stratId) &&
+        !stratId.includes(candId)
+      ) {
         warnings.push(
           `Selected candidate "${candId}" does not match strategy.type "${strategy.type}".`,
+        );
+      }
+    }
+    // fit_score is the verdict of the comparison: the selected
+    // candidate should be the highest-scoring one. When it isn't,
+    // the scores don't back the pick — the plan itself stays (it
+    // serves strategy.type), but the user is told the comparison
+    // is internally inconsistent.
+    const scored = candidates.filter((c) => typeof c.fit_score === "number");
+    if (scored.length >= 2 && typeof picked.fit_score === "number") {
+      const top = scored.reduce((a, b) =>
+        (b.fit_score ?? 0) > (a.fit_score ?? 0) ? b : a,
+      );
+      if (top !== picked) {
+        warnings.push(
+          `Selection audit: "${picked.id}" was selected with fit ${picked.fit_score}, but "${top.id}" scores ${top.fit_score} — the comparison does not back the pick.`,
         );
       }
     }
@@ -723,6 +864,11 @@ export function validateStrategy(
     attack_phases,
     confidence,
   };
+
+  // ---- selection audit ----
+  // Cross-checks the picked strategy against the base analysis
+  // the model itself reported (see auditSelection).
+  auditSelection(strategyOut, warnings);
 
   const ok = errors.length === 0;
   return {

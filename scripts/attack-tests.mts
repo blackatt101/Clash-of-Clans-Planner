@@ -5,6 +5,7 @@
  */
 import { resolveEntity, resolveSlug, capacitiesForTH, totalHousing, isCcEligible } from "../src/lib/attack/catalog";
 import { validateStrategy, clampPoint } from "../src/lib/attack/validate";
+import { resolveStrategyId, strategyById, strategyMinTH, STRATEGIES } from "../src/lib/attack/strategies";
 import { arrowHead, pathD, placeLabels, rectsOverlap, simplifyPath, toVb, type PlacedLabel, type Rect } from "../src/lib/attack/geometry";
 import { pathStepIndex, spellStepIndex, stepVis, isRendered, VIS_OPACITY } from "../src/lib/attack/steps";
 
@@ -581,6 +582,129 @@ t('candidates: mismatch with strategy.type is warned',
   rMismatch.warnings.some((w) => /does not match strategy\.type/.test(w)),
   JSON.stringify(rMismatch.warnings));
 
+// ---------------------------------------------------------------------------
+// Strategy catalog + selection hardening: canonical ids, TH gating,
+// selection repair, fit-score consistency, deterministic audit.
+// ---------------------------------------------------------------------------
+t('catalog: naming variants resolve to one canonical id',
+  resolveStrategyId('GoWiPe') === 'gowipe' &&
+    resolveStrategyId('go wi pe') === 'gowipe' &&
+    resolveStrategyId('Queen Charge Hybrid') === 'queen-charge-hybrid' &&
+    resolveStrategyId('lalo') === 'lavaloon',
+  `${resolveStrategyId('GoWiPe')} ${resolveStrategyId('go wi pe')} ${resolveStrategyId('Queen Charge Hybrid')} ${resolveStrategyId('lalo')}`);
+t('catalog: unknown id stays free-form', resolveStrategyId('my-cool-attack') === null);
+t('catalog: every strategy has a minTH and capability tags',
+  STRATEGIES.every((s) => s.minTH >= 3 && s.tags.length > 0));
+t('catalog: strategyById round-trips',
+  strategyById('lavaloon')?.name === 'Lavaloon' && strategyMinTH('super-archer-blimp') === 12);
+
+// Naming variants collapse onto the canonical slug in the output.
+const stratCanon = JSON.parse(JSON.stringify(strat));
+stratCanon.strategy.type = 'gowipe';
+stratCanon.candidate_strategies = [
+  { id: 'GoWiPe', name: 'GoWiPe', fit_score: 0.7, selected: true },
+  { id: 'Lavaloon', name: 'Lavaloon', fit_score: 0.4, selected: false },
+];
+const rCanon = validateStrategy(stratCanon, { townHall: 15 });
+t('catalog: variant ids are canonicalized in the output',
+  rCanon.strategy.candidate_strategies?.[0].id === 'gowipe' &&
+    rCanon.strategy.candidate_strategies?.[1].id === 'lavaloon',
+  JSON.stringify(rCanon.strategy.candidate_strategies?.map((c) => c.id)));
+
+// TH gating: a TH8 army cannot field TH12+ strategies — the
+// candidate is dropped exactly like a TH-unavailable unit.
+const stratTH8 = JSON.parse(JSON.stringify(strat));
+stratTH8.strategy.type = 'gowipe';
+stratTH8.candidate_strategies = [
+  { id: 'super-archer-blimp', name: 'Super Archer Blimp', fit_score: 0.9, selected: true },
+  { id: 'gowipe', name: 'GoWiPe', fit_score: 0.5, selected: false },
+];
+const rTH8 = validateStrategy(stratTH8, { townHall: 8 });
+t('catalog: TH-unavailable strategy is dropped',
+  rTH8.strategy.candidate_strategies?.length === 1 &&
+    rTH8.strategy.candidate_strategies?.[0].id === 'gowipe' &&
+    rTH8.warnings.some((w) => /needs TH12\+/.test(w)),
+  JSON.stringify(rTH8.warnings));
+
+// The plan serves strategy.type, so the candidate matching it is
+// re-marked selected when the model flagged a different entry.
+const stratRepair = JSON.parse(JSON.stringify(strat));
+stratRepair.strategy.type = 'lavaloon';
+stratRepair.candidate_strategies = [
+  { id: 'queen-charge-hybrid', name: 'QCH', fit_score: 0.9, selected: true },
+  { id: 'lavaloon', name: 'Lavaloon', fit_score: 0.6, selected: false },
+];
+const rRepair = validateStrategy(stratRepair, { townHall: 15 });
+t('selection: candidate matching strategy.type is re-marked',
+  rRepair.strategy.candidate_strategies?.[1].selected === true &&
+    rRepair.strategy.candidate_strategies?.[0].selected === false &&
+    rRepair.warnings.some((w) => /serves strategy\.type/.test(w)),
+  JSON.stringify(rRepair.warnings));
+
+// Fit scores that contradict the pick -> flagged, plan kept
+// (the army serves strategy.type, so the selection stays).
+const stratScore = JSON.parse(JSON.stringify(strat));
+stratScore.strategy.type = 'queen-charge-hybrid';
+stratScore.candidate_strategies = [
+  { id: 'queen-charge-hybrid', name: 'QCH', fit_score: 0.4, selected: true },
+  { id: 'lavaloon', name: 'Lavaloon', fit_score: 0.9, selected: false },
+];
+const rScore = validateStrategy(stratScore, { townHall: 15 });
+t('selection: scores that contradict the pick are flagged',
+  rScore.warnings.some((w) => /does not back the pick/.test(w)) &&
+    rScore.strategy.candidate_strategies?.[0].selected === true,
+  JSON.stringify(rScore.warnings));
+
+// A single-candidate comparison is not a comparison.
+const stratOne = JSON.parse(JSON.stringify(strat));
+stratOne.strategy.type = 'queen-charge-hybrid';
+stratOne.candidate_strategies = [
+  { id: 'queen-charge-hybrid', name: 'QCH', fit_score: 0.9, selected: true },
+];
+const rOne = validateStrategy(stratOne, { townHall: 15 });
+t('selection: a single-candidate comparison is flagged',
+  rOne.warnings.some((w) => /Only 1 candidate strategy/.test(w)));
+
+// Audit: a ground-only pick against a base whose Air Defenses
+// are a key threat (ground troops cannot hit them at all).
+const stratAir = JSON.parse(JSON.stringify(strat));
+stratAir.strategy.type = 'gowipe';
+stratAir.candidate_strategies = [
+  { id: 'gowipe', name: 'GoWiPe', fit_score: 0.8, selected: true },
+  { id: 'lavaloon', name: 'Lavaloon', fit_score: 0.5, selected: false },
+];
+stratAir.base_analysis = {
+  keyDefenses: [
+    { type: 'air_defense', position: { x: 0.5, y: 0.5 }, threat: 'high' },
+  ],
+};
+const rAir = validateStrategy(stratAir, { townHall: 15 });
+t('audit: ground-only pick against an air-defense threat',
+  rAir.warnings.some((w) => /ground-only attack/.test(w)),
+  JSON.stringify(rAir.warnings));
+
+// Audit: a Battle Blimp against a high-threat Air Defense.
+const stratBlimp = JSON.parse(JSON.stringify(stratAir));
+stratBlimp.strategy.type = 'super-archer-blimp';
+stratBlimp.candidate_strategies = [
+  { id: 'super-archer-blimp', name: 'Super Archer Blimp', fit_score: 0.8, selected: true },
+];
+const rBlimp = validateStrategy(stratBlimp, { townHall: 15 });
+t('audit: blimp against a high-threat Air Defense',
+  rBlimp.warnings.some((w) => /Battle Blimp/.test(w)),
+  JSON.stringify(rBlimp.warnings));
+
+// Audit: a hero-led pick with no hero deployed.
+const stratHero = JSON.parse(JSON.stringify(strat));
+stratHero.strategy.type = 'queen-charge-hybrid';
+stratHero.heroes = [
+  { id: 'archer-queen', use: false, role: null, reason: 'Not used.' },
+];
+const rHeroLed = validateStrategy(stratHero, { townHall: 15 });
+t('audit: hero-led pick with no hero deployed',
+  rHeroLed.warnings.some((w) => /hero-led attack, but no hero is deployed/.test(w)),
+  JSON.stringify(rHeroLed.warnings));
+
 // Armies carry purposes; the siege machine explains itself.
 const stratPurp = JSON.parse(JSON.stringify(base));
 stratPurp.army.troops = [
@@ -670,6 +794,10 @@ t('fixture: analysis depth survives validation',
     (rFix.strategy.base_analysis?.pathingNotes?.length ?? 0) > 40);
 t('fixture: entry points carry the evaluation',
   (rFix.strategy.base_analysis?.entryPoints?.[0].reachableDefenses ?? '').length > 0);
+t('fixture: a coherent plan raises no selection audit',
+  !rFix.warnings.some((w) => /Selection audit/.test(w)) &&
+    !rFix.warnings.some((w) => /does not back the pick/.test(w)),
+  JSON.stringify(rFix.warnings));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

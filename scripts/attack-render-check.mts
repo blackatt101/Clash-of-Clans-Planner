@@ -18,6 +18,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as OverlayNS from "../src/components/attack/AttackOverlay";
 import { validateStrategy } from "../src/lib/attack/validate";
+import { resolveStrategyId } from "../src/lib/attack/strategies";
 import { totalHousing, totalSpellHousing } from "../src/lib/attack/catalog";
 import { pathStepIndex, spellStepIndex } from "../src/lib/attack/steps";
 import type { AttackStrategy } from "../src/lib/attack/types";
@@ -238,6 +239,9 @@ t("selected heroes are deployed in the visual plan",
 const cands = strategy.candidate_strategies ?? [];
 t("strategy selection: multiple candidates compared",
   cands.length >= 2, JSON.stringify(cands.map((c) => c.id)));
+t("strategy selection: candidate ids are canonical catalog slugs",
+  cands.every((c) => resolveStrategyId(c.id) === c.id),
+  JSON.stringify(cands.map((c) => c.id)));
 t("strategy selection: exactly one candidate selected",
   cands.filter((c) => c.selected === true).length === 1);
 t("strategy selection: selected candidate matches strategy.type",

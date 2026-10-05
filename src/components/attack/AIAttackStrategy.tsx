@@ -85,6 +85,13 @@ export default function AIAttackStrategy({ open, onClose, images, onSaved }: AIA
   const [phase, setPhase] = useState<Phase>(init ? "result" : "setup");
   const [strategy, setStrategy] = useState<AttackStrategy | null>(init?.strategy ?? null);
   const [savedSrc, setSavedSrc] = useState<string | null>(init?.baseSrc ?? null);
+  /**
+   * Validator notes from the latest generation: repairs the
+   * planner made (loadouts trimmed, units dropped) and
+   * selection-audit doubts. Per-generation diagnostics — they
+   * are not part of the saved/shared strategy itself.
+   */
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const caps = capacitiesForTH(townHall);
 
@@ -138,6 +145,11 @@ export default function AIAttackStrategy({ open, onClose, images, onSaved }: AIA
         throw new Error(typeof json.error === "string" ? json.error : "Generation failed.");
       }
       setStrategy(json.strategy);
+      setWarnings(
+        Array.isArray(json.warnings)
+          ? json.warnings.filter((w: unknown) => typeof w === "string")
+          : [],
+      );
       setSavedSrc(dataUrl);
       setPhase("result");
     } catch (e) {
@@ -176,6 +188,7 @@ export default function AIAttackStrategy({ open, onClose, images, onSaved }: AIA
   const regenerate = useCallback(() => {
     clearAttackPlan();
     setStrategy(null);
+    setWarnings([]);
     setSavedSrc(null);
     setPhase("setup");
   }, []);
@@ -379,6 +392,7 @@ export default function AIAttackStrategy({ open, onClose, images, onSaved }: AIA
           images={images}
           iconOf={iconOf}
           townHall={townHall}
+          warnings={warnings}
           onStrategyChange={setStrategy}
           onBaseImage={(url) => {
             setSavedSrc(url);
@@ -400,6 +414,7 @@ function ResultView({
   images,
   iconOf,
   townHall,
+  warnings,
   onStrategyChange,
   onBaseImage,
 }: {
@@ -408,6 +423,8 @@ function ResultView({
   images: Record<string, string>;
   iconOf: (slug: string, size?: string) => React.ReactNode;
   townHall: number;
+  /** Validator notes from this generation (repairs, audit doubts). */
+  warnings: string[];
   onStrategyChange: (s: AttackStrategy) => void;
   onBaseImage?: (url: string) => void;
 }) {
@@ -504,6 +521,23 @@ function ResultView({
                 ) : c.rejected_reason ? (
                   <p className="mt-0.5 text-ink-faint">{c.rejected_reason}</p>
                 ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* A3 — Planner notes: what the validator repaired or questions */}
+      {warnings.length ? (
+        <section className="surface-panel rounded-xl border border-line p-4">
+          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-dim">
+            Planner notes
+          </h3>
+          <ul className="flex flex-col gap-1.5">
+            {warnings.map((w, i) => (
+              <li key={i} className="flex gap-2 text-[12px] leading-snug text-ink-dim">
+                <span className="mt-0.5 shrink-0 text-ink-faint">•</span>
+                <span>{w}</span>
               </li>
             ))}
           </ul>
