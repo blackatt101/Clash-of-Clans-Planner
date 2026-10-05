@@ -497,5 +497,179 @@ const rNoDep = validateStrategy(noDep, { townHall: 15 });
 t('warning: used hero with no deployment or ability',
   rNoDep.warnings.some((w) => /marked used but has no deployment/.test(w)));
 
+// ---------------------------------------------------------------------------
+// Strategy-selection quality (§6–§20): candidate comparison, base
+// analysis depth, army/siege purposes, confidence sub-scores.
+// ---------------------------------------------------------------------------
+const strat = JSON.parse(JSON.stringify(base));
+strat.candidate_strategies = [
+  { id: 'queen-charge-hybrid', name: 'Queen Charge Hybrid', fit_score: 0.86,
+    strengths: ['West side is open.', 'Eagle is on the air path.'],
+    weaknesses: ['Inferno can snipe the Queen.'], selected: true },
+  { id: 'lavaloon', name: 'Lavaloon', fit_score: 0.52,
+    strengths: ['Air defenses reachable.'],
+    weaknesses: ['Air sweeper covers the Lalo path.'],
+    selected: false, rejected_reason: 'Pathing too unpredictable.' },
+];
+const rCand = validateStrategy(strat, { townHall: 15 });
+t('candidates: parsed with fit scores',
+  rCand.strategy.candidate_strategies?.length === 2 &&
+    rCand.strategy.candidate_strategies?.[0].fit_score === 0.86,
+  JSON.stringify(rCand.strategy.candidate_strategies));
+t('candidates: exactly one selected',
+  rCand.strategy.candidate_strategies?.filter((c) => c.selected).length === 1);
+t('candidates: rejected entry keeps its reason',
+  rCand.strategy.candidate_strategies?.[1].rejected_reason === 'Pathing too unpredictable.');
+
+// Missing strategy.type -> backfilled from the selected candidate so the
+// output stays self-consistent (selected id === strategy.type).
+const stratNoType = JSON.parse(JSON.stringify(strat));
+delete stratNoType.strategy.type;
+const rNoType = validateStrategy(stratNoType, { townHall: 15 });
+t('candidates: missing strategy.type backfilled from the pick',
+  rNoType.strategy.strategy.type === 'queen-charge-hybrid' &&
+    rNoType.warnings.some((w) => /backfilled from the selected candidate/.test(w)),
+  `type=${rNoType.strategy.strategy.type}`);
+// Present but mismatched type -> kept, only warned (never silently overridden).
+const stratBadType = JSON.parse(JSON.stringify(strat));
+stratBadType.strategy.type = 'hydra';
+const rBadType = validateStrategy(stratBadType, { townHall: 15 });
+t('candidates: mismatched type is warned, not overridden',
+  rBadType.strategy.strategy.type === 'hydra' &&
+    rBadType.warnings.some((w) => /does not match strategy\.type/.test(w)),
+  `type=${rBadType.strategy.strategy.type}`);
+
+// No candidate marked selected -> the first becomes the pick.
+const stratNoPick = JSON.parse(JSON.stringify(strat));
+delete stratNoPick.candidate_strategies[0].selected;
+delete stratNoPick.candidate_strategies[1].selected;
+const rNoPick = validateStrategy(stratNoPick, { townHall: 15 });
+t('candidates: first becomes the pick when none is selected',
+  rNoPick.strategy.candidate_strategies?.[0].selected === true &&
+    rNoPick.warnings.some((w) => /marked selected; the first/.test(w)));
+
+// Several marked selected -> only the first counts.
+const stratMulti = JSON.parse(JSON.stringify(strat));
+stratMulti.candidate_strategies[1].selected = true;
+const rMulti = validateStrategy(stratMulti, { townHall: 15 });
+t('candidates: only the first selected entry counts',
+  rMulti.strategy.candidate_strategies?.filter((c) => c.selected).length === 1 &&
+    rMulti.warnings.some((w) => /only the first counts/.test(w)));
+
+// Dedupe + cap: 8 unique entries -> capped at 6, first-selected wins.
+const stratCap = JSON.parse(JSON.stringify(strat));
+stratCap.candidate_strategies = Array.from({ length: 8 }, (_, i) => ({
+  id: i === 5 ? 'lavaloon' : `strategy-${i}`,
+  name: `Strategy ${i}`,
+  selected: i === 4,
+}));
+const rCandCap = validateStrategy(stratCap, { townHall: 15 });
+t('candidates: deduped and capped at 6',
+  rCandCap.strategy.candidate_strategies?.length === 6,
+  String(rCandCap.strategy.candidate_strategies?.length));
+t('candidates: cap warning recorded',
+  rCandCap.warnings.some((w) => /extra candidate strategy/.test(w)));
+
+// Selected candidate vs strategy.type mismatch -> warned.
+const stratMismatch = JSON.parse(JSON.stringify(strat));
+stratMismatch.strategy.type = 'queen-charge-hybrid';
+stratMismatch.candidate_strategies = [
+  { id: 'witch-smash', name: 'Witch Smash', selected: true },
+];
+const rMismatch = validateStrategy(stratMismatch, { townHall: 15 });
+t('candidates: mismatch with strategy.type is warned',
+  rMismatch.warnings.some((w) => /does not match strategy\.type/.test(w)),
+  JSON.stringify(rMismatch.warnings));
+
+// Armies carry purposes; the siege machine explains itself.
+const stratPurp = JSON.parse(JSON.stringify(base));
+stratPurp.army.troops = [
+  { id: 'miner', count: 15, purpose: 'Main ground pressure' },
+  { id: 'hog-rider', count: 10, purpose: 'Follow the miners in.' },
+];
+stratPurp.army.spells = [{ id: 'healing-spell', count: 3, purpose: 'Keep the hybrid alive.' }];
+stratPurp.army.siege_machine = { id: 'siege-barracks', purpose: 'Opens the west funnel.' };
+const rPurp = validateStrategy(stratPurp, { townHall: 15 });
+t('purposes: troop purpose preserved',
+  rPurp.strategy.army.troops[0].purpose === 'Main ground pressure');
+t('purposes: spell purpose preserved',
+  rPurp.strategy.army.spells[0].purpose === 'Keep the hybrid alive.');
+t('purposes: siege purpose preserved',
+  rPurp.strategy.army.siege_machine?.purpose === 'Opens the west funnel.');
+
+// Base analysis depth: traits, key defenses, pathing notes, entry evaluation.
+const stratDeep = JSON.parse(JSON.stringify(base));
+stratDeep.base_analysis = {
+  ...stratDeep.base_analysis,
+  structuralTraits: ['ring base', 'offset Town Hall', 'exposed eagle artillery'],
+  keyDefenses: [
+    { type: 'eagle_artillery', position: { x: 0.4, y: 0.4 }, threat: 'high' },
+    { type: 'air_defense', position: { x: 0.7, y: 0.4 }, threat: 'medium' },
+  ],
+  pathingNotes: 'Deploy west → funnel → entry → core → cleanup.',
+  entryPoints: [
+    {
+      position: { x: 0.2, y: 0.8 },
+      reason: 'Widest gap.',
+      reachableDefenses: 'West cannons',
+      heroAccess: 'Queen reaches the CC.',
+      risk: 'Low.',
+    },
+  ],
+};
+const rDeep = validateStrategy(stratDeep, { townHall: 15 });
+t('analysis: structural traits preserved',
+  JSON.stringify(rDeep.strategy.base_analysis?.structuralTraits)
+    === '["ring base","offset Town Hall","exposed eagle artillery"]');
+t('analysis: key defenses with threat levels',
+  rDeep.strategy.base_analysis?.keyDefenses?.[0].threat === 'high' &&
+    rDeep.strategy.base_analysis?.keyDefenses?.length === 2);
+t('analysis: pathing notes preserved',
+  rDeep.strategy.base_analysis?.pathingNotes?.startsWith('Deploy west') === true);
+t('analysis: entry point evaluation fields',
+  rDeep.strategy.base_analysis?.entryPoints?.[0].reachableDefenses === 'West cannons' &&
+    rDeep.strategy.base_analysis?.entryPoints?.[0].heroAccess === 'Queen reaches the CC.' &&
+    rDeep.strategy.base_analysis?.entryPoints?.[0].risk === 'Low.');
+
+// Confidence sub-scores: kept when given, absent (not faked) when not.
+const stratConf = JSON.parse(JSON.stringify(base));
+stratConf.confidence = {
+  base_analysis: 0.91, strategy: 0.85, deployment: 0.8,
+  strategy_selection: 0.87, army_composition: 0.84,
+};
+const rConf = validateStrategy(stratConf, { townHall: 15 });
+t('confidence: sub-scores kept',
+  rConf.strategy.confidence?.strategy_selection === 0.87 &&
+    rConf.strategy.confidence?.army_composition === 0.84);
+t('confidence: sub-scores absent when unassessed',
+  r1.strategy.confidence?.strategy_selection === undefined &&
+    r1.strategy.confidence?.army_composition === undefined);
+
+// Deployments without purposes are flagged (cause-and-effect check).
+const stratNoPurp = JSON.parse(JSON.stringify(base));
+delete stratNoPurp.deployment_plan[0].purpose;
+const rNoPurp = validateStrategy(stratNoPurp, { townHall: 15 });
+t('warning: deployment step without a purpose',
+  rNoPurp.warnings.some((w) => /deployment step\(s\) without a purpose/.test(w)));
+
+// The full fixture (realistic model output) carries the new fields end-to-end.
+const { fixture } = await import('./attack-fixture.mts');
+const rFix = validateStrategy(fixture, { townHall: 15 });
+t('fixture: candidates survive validation',
+  rFix.ok && (rFix.strategy.candidate_strategies?.length ?? 0) === 3 &&
+    (rFix.strategy.candidate_strategies?.some((c) => c.selected === true && c.id === 'queen-charge-hybrid') ?? false),
+  JSON.stringify(rFix.errors));
+t('fixture: army purposes survive validation',
+  rFix.strategy.army.troops.every((tr) => (tr.purpose ?? '').length > 0) &&
+    rFix.strategy.army.spells.every((sp) => (sp.purpose ?? '').length > 0));
+t('fixture: siege machine has its purpose',
+  (rFix.strategy.army.siege_machine?.purpose ?? '').length > 0);
+t('fixture: analysis depth survives validation',
+  (rFix.strategy.base_analysis?.structuralTraits?.length ?? 0) >= 3 &&
+    (rFix.strategy.base_analysis?.keyDefenses?.length ?? 0) >= 4 &&
+    (rFix.strategy.base_analysis?.pathingNotes?.length ?? 0) > 40);
+t('fixture: entry points carry the evaluation',
+  (rFix.strategy.base_analysis?.entryPoints?.[0].reachableDefenses ?? '').length > 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

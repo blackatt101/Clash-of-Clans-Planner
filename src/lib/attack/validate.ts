@@ -24,6 +24,12 @@
  *    from TH7: TH9=2, TH11=3, TH13=4, TH15=5) are enforced —
  *    extras are excluded with the limit as their reason, and
  *    their deployment steps / paths / abilities are dropped
+ *  - candidate strategies -> normalized, deduped, capped at 6;
+ *    exactly one selected (first wins when the model marks
+ *    none or several); rejected entries get a reason
+ *  - army / siege / CC entries -> carry an optional purpose
+ *  - base analysis -> structural traits, key defenses and
+ *    pathing notes parsed with the same slice/cap policy
  */
 import {
   heroBattlefieldLimit,
@@ -36,6 +42,7 @@ import { HEROES } from "./catalog.generated";
 import type {
   ArmyConstraints,
   AttackStrategy,
+  CandidateStrategy,
   DeploymentStep,
   HeroDecision,
   Point,
@@ -158,6 +165,93 @@ export function validateStrategy(
   };
   if (!strategy.reason) warnings.push("Strategy is missing a rationale.");
 
+  // ---- candidate strategies (the comparison behind the pick) ----
+  // Strategy slugs are free-form (not catalog units), so they are
+  // normalized as text, deduped and capped at 6. Exactly one entry
+  // may be selected; a list without a pick marks the first as the
+  // chosen one so the UI always has a selection to highlight.
+  const candidates: CandidateStrategy[] = [];
+  const seenCand = new Set<string>();
+  for (const c of asArray(rawObj.candidate_strategies)) {
+    const id = String(c?.id ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .slice(0, 60);
+    if (!id || seenCand.has(id)) continue;
+    seenCand.add(id);
+    candidates.push({
+      id,
+      name: String(c?.name ?? "").trim().slice(0, 60) || id,
+      fit_score: isNum(c?.fit_score) ? Math.min(1, Math.max(0, c.fit_score)) : undefined,
+      strengths: asArray(c?.strengths)
+        .map((s) => String(s ?? "").trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 4),
+      weaknesses: asArray(c?.weaknesses)
+        .map((s) => String(s ?? "").trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 4),
+      selected: c?.selected === true,
+      rejected_reason:
+        c?.selected === true || !c?.rejected_reason
+          ? undefined
+          : String(c.rejected_reason).trim().slice(0, 300),
+    });
+  }
+  if (candidates.length > 6) {
+    warnings.push(
+      `${candidates.length - 6} extra candidate strategy/strategies dropped (cap 6).`,
+    );
+    candidates.length = 6;
+  }
+  const firstSelected = candidates.findIndex((c) => c.selected);
+  if (candidates.length && firstSelected === -1) {
+    candidates[0].selected = true;
+    warnings.push(
+      "No candidate strategy was marked selected; the first is treated as the pick.",
+    );
+  } else if (firstSelected >= 0) {
+    const extras = candidates.filter((c, i) => c.selected && i !== firstSelected).length;
+    if (extras > 0) {
+      candidates.forEach((c, i) => {
+        if (c.selected && i !== firstSelected) c.selected = false;
+      });
+      warnings.push(
+        `${extras + 1} candidate strategies were marked selected; only the first counts.`,
+      );
+    }
+  }
+  for (const c of candidates) {
+    if (!c.selected && !c.rejected_reason) {
+      c.rejected_reason = "Not the strongest fit for this base.";
+    }
+  }
+  // The selected candidate should be the strategy that was picked.
+  const picked = candidates.find((c) => c.selected);
+  if (picked) {
+    if (!strategy.type) {
+      // The model omitted strategy.type: the selected candidate IS the
+      // pick, so its id is the type — keeps the output self-consistent
+      // with the prompt's contract (selected id === strategy.type).
+      strategy.type = picked.id;
+      warnings.push(
+        `strategy.type was missing; backfilled from the selected candidate ("${picked.id}").`,
+      );
+    } else {
+      const norm = (s: string) =>
+        s.trim().toLowerCase().replace(/\s+/g, "-").replace(/-+/g, "-");
+      const candId = picked.id;
+      const stratId = norm(strategy.type);
+      if (candId !== stratId && !candId.includes(stratId) && !stratId.includes(candId)) {
+        warnings.push(
+          `Selected candidate "${candId}" does not match strategy.type "${strategy.type}".`,
+        );
+      }
+    }
+  }
+
   // ---- army troops / spells / siege / CC ----
   const troops: { id: string; count: number }[] = [];
   const seenTroop = new Set<string>();
@@ -183,7 +277,11 @@ export function validateStrategy(
       continue;
     }
     seenTroop.add(slug);
-    troops.push({ id: slug, count: n });
+    troops.push({
+      id: slug,
+      count: n,
+      ...(t?.purpose ? { purpose: String(t.purpose).trim().slice(0, 200) } : {}),
+    });
   }
 
   const spells: { id: string; count: number }[] = [];
@@ -205,15 +303,24 @@ export function validateStrategy(
       continue;
     }
     seenSpell.add(slug);
-    spells.push({ id: slug, count: n });
+    spells.push({
+      id: slug,
+      count: n,
+      ...(s?.purpose ? { purpose: String(s.purpose).trim().slice(0, 200) } : {}),
+    });
   }
 
-  let siege: { id: string } | undefined;
+  let siege: { id: string; purpose?: string } | undefined;
   const siegeRaw = rawObj.army?.siege_machine;
   if (siegeRaw?.id) {
     const slug = resolveSlug(siegeRaw.id);
     if (slug && resolveEntity(slug)?.kind === "siege" && thAvailable(slug, constraints.townHall)) {
-      siege = { id: slug };
+      siege = {
+        id: slug,
+        ...(siegeRaw.purpose
+          ? { purpose: String(siegeRaw.purpose).trim().slice(0, 200) }
+          : {}),
+      };
     } else {
       warnings.push(`Unknown or TH-unavailable siege machine "${String(siegeRaw.id)}" dropped.`);
     }
@@ -430,6 +537,14 @@ export function validateStrategy(
   if (deployment_plan.length === 0) {
     errors.push("Deployment plan is empty — at least one deployment is required.");
   }
+  // Cause-and-effect deployments carry a purpose; flag plans that
+  // don't (diagnostic only — the prompt demands purposes).
+  const stepsWithoutPurpose = deployment_plan.filter((s) => !s.purpose).length;
+  if (stepsWithoutPurpose > 0) {
+    warnings.push(
+      `${stepsWithoutPurpose} deployment step(s) without a purpose.`,
+    );
+  }
 
   // Paths / spells reference the 1-based step they belong to, in the
   // MODEL's numbering — remapped through the merge above. Out-of-range
@@ -533,6 +648,23 @@ export function validateStrategy(
     townHallWeapon: ba.townHallWeapon ? String(ba.townHallWeapon).slice(0, 40) : undefined,
     clanCastlePosition: ba.clanCastlePosition ? clampPoint(ba.clanCastlePosition) : undefined,
     baseShape: ba.baseShape ? String(ba.baseShape).slice(0, 60) : undefined,
+    structuralTraits: asArray(ba.structuralTraits)
+      .map((s) => String(s ?? "").trim().slice(0, 60))
+      .filter(Boolean)
+      .slice(0, 8),
+    keyDefenses: (asArray(ba.keyDefenses) as Raw[])
+      .map((k) => ({
+        type: String(k?.type ?? "unknown_defense"),
+        position: clampPoint(k?.position),
+        threat: (["high", "medium", "low"] as const).includes(k?.threat)
+          ? k.threat
+          : "medium",
+      }))
+      .filter((k) => k.type)
+      .slice(0, 12),
+    pathingNotes: ba.pathingNotes
+      ? String(ba.pathingNotes).trim().slice(0, 800)
+      : undefined,
     layoutNotes: ba.layoutNotes ? String(ba.layoutNotes).slice(0, 500) : undefined,
     importantTargets: (asArray(ba.importantTargets) as Raw[])
       .map((t) => ({
@@ -545,7 +677,14 @@ export function validateStrategy(
       .filter((t) => t.type),
     entryPoints: (asArray(ba.entryPoints) as Raw[]).map((e) => ({
       position: clampPoint(e?.position),
-      reason: e?.reason ? String(e.reason).slice(0, 160) : undefined,
+      reason: e?.reason ? String(e.reason).slice(0, 240) : undefined,
+      reachableDefenses: e?.reachableDefenses
+        ? String(e.reachableDefenses).trim().slice(0, 160)
+        : undefined,
+      heroAccess: e?.heroAccess
+        ? String(e.heroAccess).trim().slice(0, 160)
+        : undefined,
+      risk: e?.risk ? String(e.risk).trim().slice(0, 160) : undefined,
     })),
     funnels: (asArray(ba.funnels) as Raw[]).map((f) => ({
       position: clampPoint(f?.position),
@@ -554,17 +693,28 @@ export function validateStrategy(
   };
 
   // ---- confidence ----
+  // The original three keep their 0.7 default for backward
+  // compatibility; the newer sub-scores stay ABSENT when the model
+  // did not assess them (an absent score is honest, a fake 70%
+  // is not).
   const conf = asRaw(rawObj.confidence);
   const confidence = {
     base_analysis: isNum(conf.base_analysis) ? Math.min(1, Math.max(0, conf.base_analysis)) : 0.7,
     strategy: isNum(conf.strategy) ? Math.min(1, Math.max(0, conf.strategy)) : 0.7,
     deployment: isNum(conf.deployment) ? Math.min(1, Math.max(0, conf.deployment)) : 0.7,
+    strategy_selection: isNum(conf.strategy_selection)
+      ? Math.min(1, Math.max(0, conf.strategy_selection))
+      : undefined,
+    army_composition: isNum(conf.army_composition)
+      ? Math.min(1, Math.max(0, conf.army_composition))
+      : undefined,
   };
 
   const strategyOut: AttackStrategy = {
     strategy,
     army: { troops, spells, ...(siege ? { siege_machine: siege } : {}), ...(ccTroops.length ? { clan_castle: ccTroops } : {}) },
     base_analysis,
+    ...(candidates.length ? { candidate_strategies: candidates } : {}),
     deployment_plan,
     heroes: heroes.length ? heroes : undefined,
     paths: paths.length ? paths : undefined,

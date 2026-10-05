@@ -234,6 +234,37 @@ t("excluded heroes have explanations",
 t("selected heroes are deployed in the visual plan",
   (strategy.heroes ?? []).filter((h) => h.use).every((h) => steps.some((s) => s.unit === h.id)));
 
+// -- strategy selection: candidates compared, purposes everywhere --
+const cands = strategy.candidate_strategies ?? [];
+t("strategy selection: multiple candidates compared",
+  cands.length >= 2, JSON.stringify(cands.map((c) => c.id)));
+t("strategy selection: exactly one candidate selected",
+  cands.filter((c) => c.selected === true).length === 1);
+t("strategy selection: selected candidate matches strategy.type",
+  cands.some((c) => c.selected === true && c.id === strategy.strategy.type));
+t("strategy selection: rejected candidates explain why",
+  cands.filter((c) => !c.selected).every((c) => (c.rejected_reason ?? "").length > 0));
+t("strategy selection: candidates carry a 0..1 fit score",
+  cands.every((c) => typeof c.fit_score === "number" && c.fit_score >= 0 && c.fit_score <= 1));
+t("army: every troop group has a purpose",
+  strategy.army.troops.every((tr) => (tr.purpose ?? "").length > 0));
+t("army: every spell group has a purpose",
+  strategy.army.spells.every((sp) => (sp.purpose ?? "").length > 0));
+t("army: the siege machine explains itself",
+  (strategy.army.siege_machine?.purpose ?? "").length > 0);
+t("analysis: structural traits identified",
+  (strategy.base_analysis?.structuralTraits?.length ?? 0) >= 3);
+t("analysis: key defenses listed with threat levels",
+  (strategy.base_analysis?.keyDefenses?.length ?? 0) >= 4 &&
+    strategy.base_analysis!.keyDefenses!.every((k) => k.threat != null));
+t("analysis: pathing reasoning recorded",
+  (strategy.base_analysis?.pathingNotes?.length ?? 0) > 40);
+t("analysis: entry points evaluated",
+  (strategy.base_analysis?.entryPoints?.[0]?.reachableDefenses ?? "").length > 0);
+t("confidence: selection and army sub-scores present",
+  typeof strategy.confidence?.strategy_selection === "number" &&
+    typeof strategy.confidence?.army_composition === "number");
+
 // -- spell relevance from the spec example: Heal at step 6 absent at step 1 --
 t("heal circle absent during step 1", !render(0).includes(`ovl-spell-${spellStep.findIndex((s) => s === 6)}`));
 

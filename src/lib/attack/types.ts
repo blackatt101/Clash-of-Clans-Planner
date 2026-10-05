@@ -30,6 +30,8 @@ export interface EntityRef {
 export interface ArmyEntry {
   id: string;
   count: number;
+  /** Why this group is in the army — main pressure, funnel, support, cleanup… */
+  purpose?: string;
 }
 
 export interface DeploymentStep {
@@ -142,6 +144,20 @@ export interface BaseTarget {
 export interface EntryPoint {
   position: Point;
   reason?: string;
+  /** Defenses this entry can reach first. */
+  reachableDefenses?: string;
+  /** Whether the Queen/King can reach valuable targets from here. */
+  heroAccess?: string;
+  /** Pathing risk: troop splits, compartments to cross, threats. */
+  risk?: string;
+}
+
+/** A defense that determines the attack strategy (§2 of the planner spec). */
+export interface KeyDefense {
+  type: string;
+  position: Point;
+  /** How much this defense shapes the plan. */
+  threat?: "high" | "medium" | "low";
 }
 
 export interface BaseAnalysis {
@@ -150,10 +166,42 @@ export interface BaseAnalysis {
   townHallWeapon?: string;
   clanCastlePosition?: Point;
   baseShape?: string;
+  /**
+   * Structural traits the screenshot actually evidences (ring base,
+   * offset Town Hall, exposed Eagle, spread defenses…). Only traits
+   * with visible evidence should be claimed.
+   */
+  structuralTraits?: string[];
+  /** The defenses that determine the strategy, with threat level. */
+  keyDefenses?: KeyDefense[];
+  /** The deployment → funnel → entry → … → cleanup pathing reasoning. */
+  pathingNotes?: string;
   layoutNotes?: string;
   importantTargets?: BaseTarget[];
   entryPoints?: EntryPoint[];
   funnels?: Funnel[];
+}
+
+/**
+ * One candidate strategy considered before the final pick. The
+ * comparison is part of the output so the selection is auditable:
+ * each candidate is judged against THIS base, and the rejected
+ * ones say why they lost.
+ */
+export interface CandidateStrategy {
+  /** Strategy slug (e.g. "queen-charge-hybrid"). */
+  id: string;
+  name: string;
+  /** 0..1 fit score for this base. */
+  fit_score?: number;
+  /** Why it fits this base. */
+  strengths?: string[];
+  /** Why it could fail here (pathing, threats, funnel…). */
+  weaknesses?: string[];
+  /** True for the strategy that was selected. */
+  selected?: boolean;
+  /** Required when not selected: why it lost to the winner. */
+  rejected_reason?: string;
 }
 
 export interface StrategyInfo {
@@ -173,12 +221,14 @@ export interface AttackStrategy {
   army: {
     troops: ArmyEntry[];
     spells: ArmyEntry[];
-    /** Optional: a single siege machine. */
-    siege_machine?: { id: string };
+    /** Optional: a single siege machine, with why it fits. */
+    siege_machine?: { id: string; purpose?: string };
     /** Optional: troops placed in the enemy Clan Castle. */
     clan_castle?: ArmyEntry[];
   };
   base_analysis?: BaseAnalysis;
+  /** The candidate strategies compared before the final pick. */
+  candidate_strategies?: CandidateStrategy[];
   deployment_plan: DeploymentStep[];
   /** Per-hero decisions for every hero available at the attacker's TH. */
   heroes?: HeroDecision[];
@@ -190,6 +240,10 @@ export interface AttackStrategy {
     base_analysis?: number;
     strategy?: number;
     deployment?: number;
+    /** Confidence in the strategy-vs-base match. Absent = unassessed. */
+    strategy_selection?: number;
+    /** Confidence in the army composition. Absent = unassessed. */
+    army_composition?: number;
   };
 }
 

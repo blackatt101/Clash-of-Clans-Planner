@@ -14,7 +14,7 @@
 import { useCallback, useRef, useState } from "react";
 import Modal from "@/components/Modal";
 import AttackPlanViewer from "./AttackPlanViewer";
-import type { AttackStrategy } from "@/lib/attack/types";
+import type { AttackStrategy, ArmyEntry } from "@/lib/attack/types";
 import {
   capacitiesForTH,
   resolveEntity,
@@ -441,8 +441,11 @@ function ResultView({
             </span>
             {confidence && (
               <span className="text-[11px] text-ink-faint">
-                confidence{" "}
-                {Math.round((confidence.strategy ?? 0) * 100)}%
+                confidence {Math.round((confidence.strategy ?? 0) * 100)}%
+                {typeof confidence.strategy_selection === "number" &&
+                  ` · selection ${Math.round(confidence.strategy_selection * 100)}%`}
+                {typeof confidence.army_composition === "number" &&
+                  ` · army ${Math.round(confidence.army_composition * 100)}%`}
               </span>
             )}
           </div>
@@ -453,6 +456,59 @@ function ResultView({
           </p>
         )}
       </section>
+
+      {/* A2 — Strategies considered before the pick */}
+      {strategy.candidate_strategies?.length ? (
+        <section className="surface-panel card-lit rounded-xl p-4">
+          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-dim">
+            Strategies considered
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {strategy.candidate_strategies.map((c) => (
+              <li
+                key={c.id}
+                className={`rounded-lg border px-3 py-2 text-[13px] ${
+                  c.selected
+                    ? "border-gold/50 bg-gold/5"
+                    : "border-line bg-surface-2/60"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-ink">{c.name}</span>
+                  <span className="flex items-center gap-2">
+                    {typeof c.fit_score === "number" && (
+                      <span className="text-[11px] text-ink-faint">
+                        fit {Math.round(c.fit_score * 100)}%
+                      </span>
+                    )}
+                    {c.selected ? (
+                      <span className="rounded-full bg-gold/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gold">
+                        selected
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-faint">
+                        rejected
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {c.strengths?.length ? (
+                  <p className="mt-1 text-ink-dim">{c.strengths.join(" · ")}</p>
+                ) : null}
+                {c.selected ? (
+                  c.weaknesses?.length ? (
+                    <p className="mt-0.5 text-ink-faint">
+                      Watch out: {c.weaknesses.join(" · ")}
+                    </p>
+                  ) : null
+                ) : c.rejected_reason ? (
+                  <p className="mt-0.5 text-ink-faint">{c.rejected_reason}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* B — Army */}
       <section className="surface-panel card-lit rounded-xl p-4">
@@ -472,11 +528,16 @@ function ResultView({
               <span>{resolveEntity(army.siege_machine.id)?.ref.name}</span>
             </span>
           )}
+          {army.siege_machine?.purpose ? (
+            <span className="w-full pl-9 text-[11px] text-ink-faint">
+              Siege purpose: {army.siege_machine.purpose}
+            </span>
+          ) : null}
           {army.clan_castle?.length ? (
             <span className="flex items-center gap-1.5">
               <b className="text-ink-faint">CC</b>
               {army.clan_castle.map((c) => (
-                <span key={c.id} className="flex items-center gap-1">
+                <span key={c.id} className="flex items-center gap-1" title={c.purpose}>
                   {iconOf(c.id, "h-6 w-6")}×{c.count}
                 </span>
               ))}
@@ -582,30 +643,42 @@ function ArmyRow({
   iconOf,
 }: {
   label: string;
-  items: { id: string; count: number }[];
+  items: ArmyEntry[];
   iconOf: (slug: string, size?: string) => React.ReactNode;
 }) {
   if (items.length === 0) return null;
+  const withPurpose = items.filter((c) => c.purpose);
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="w-14 shrink-0 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-        {label}
-      </span>
-      <div className="flex flex-wrap gap-2">
-        {items.map((c) => (
-          <span
-            key={c.id}
-            className="flex items-center gap-1.5 rounded-lg border border-line bg-surface-2/60 px-2 py-1"
-            title={resolveEntity(c.id)?.ref.name ?? c.id}
-          >
-            {iconOf(c.id, "h-6 w-6")}
-            <span className="text-[12px] text-ink-dim">
-              {resolveEntity(c.id)?.ref.name ?? c.id}
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="w-14 shrink-0 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+          {label}
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {items.map((c) => (
+            <span
+              key={c.id}
+              className="flex items-center gap-1.5 rounded-lg border border-line bg-surface-2/60 px-2 py-1"
+              title={c.purpose ?? (resolveEntity(c.id)?.ref.name ?? c.id)}
+            >
+              {iconOf(c.id, "h-6 w-6")}
+              <span className="text-[12px] text-ink-dim">
+                {resolveEntity(c.id)?.ref.name ?? c.id}
+              </span>
+              <span className="text-[12px] font-bold text-ink">×{c.count}</span>
             </span>
-            <span className="text-[12px] font-bold text-ink">×{c.count}</span>
-          </span>
-        ))}
+          ))}
+        </div>
       </div>
+      {withPurpose.length ? (
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 pl-14 text-[11px] leading-snug text-ink-faint">
+          {withPurpose.map((c) => (
+            <span key={c.id}>
+              {resolveEntity(c.id)?.ref.name ?? c.id} — {c.purpose}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
