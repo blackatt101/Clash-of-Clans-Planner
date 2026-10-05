@@ -11,16 +11,35 @@
  *   4. troop groups render as ONE marker ("Miner ×15"), not a swarm
  *   5. no label overlaps a label, a marker, or another label's leader
  *   6. placement is deterministic (same input -> byte-identical SVG)
+ *   7. the overlay stays an annotation layer: small markers, small
+ *      translucent spell areas, a route weight hierarchy, and one
+ *      colour per attack group (marker, label and route agree)
+ *   8. the step-by-step and army-composition panels carry the
+ *      instructions off the map
  *
  * Run: npx tsx scripts/attack-render-check.mts
  */
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as OverlayNS from "../src/components/attack/AttackOverlay";
+import * as StepsNS from "../src/components/attack/AttackStepsPanel";
+import * as ArmyNS from "../src/components/attack/AttackArmyPanel";
 import { validateStrategy } from "../src/lib/attack/validate";
 import { resolveStrategyId } from "../src/lib/attack/strategies";
-import { totalHousing, totalSpellHousing } from "../src/lib/attack/catalog";
+import { resolveEntity, totalHousing, totalSpellHousing } from "../src/lib/attack/catalog";
 import { pathStepIndex, spellStepIndex } from "../src/lib/attack/steps";
+import {
+  BADGE_R,
+  MARKER_R,
+  PATH_WEIGHTS,
+  SPELL_DEFAULT_RADIUS,
+  SPELL_FILL_OPACITY,
+  SPELL_RADIUS,
+  pathRole,
+  phaseColor,
+  phaseIndexOf,
+  targetGlyph,
+} from "../src/lib/attack/visuals";
 import type { AttackStrategy } from "../src/lib/attack/types";
 import { fixture as raw } from "./attack-fixture.mts";
 
@@ -101,7 +120,7 @@ function markerOpacity(markup: string, i: number): number | null {
   return m ? Number(m[1]) : null;
 }
 
-function markerCircle(markup: string, i: number): { cx: number; cy: number; r: number } | null {
+function markerCircle(markup: string, i: number): { cx: number; cy: number; r: number; stroke: string } | null {
   const start = markup.indexOf(`<g id="m-${i}"`);
   if (start < 0) return null;
   const end = markup.indexOf("</g>", start);
@@ -111,7 +130,35 @@ function markerCircle(markup: string, i: number): { cx: number; cy: number; r: n
   const cx = Number(m[0].match(/cx="([\d.]+)"/)?.[1]);
   const cy = Number(m[0].match(/cy="([\d.]+)"/)?.[1]);
   const r = Number(m[0].match(/r="([\d.]+)"/)?.[1]);
-  return { cx, cy, r };
+  const stroke = m[0].match(/stroke="([^"]+)"/)?.[1] ?? "";
+  return { cx, cy, r, stroke };
+}
+
+/** The markup segment of <g id="..."> up to its first closing tag. */
+function segment(markup: string, id: string): string {
+  const start = markup.indexOf(`<g id="${id}"`);
+  return start < 0 ? "" : markup.slice(start, markup.indexOf("</g>", start));
+}
+
+/** Every <circle> in a group: radius and stroke colour. */
+function circlesIn(markup: string, id: string): { r: number; stroke: string }[] {
+  return [...segment(markup, id).matchAll(/<circle\b[^>]*>/g)].map((m) => ({
+    r: Number(m[0].match(/r="([\d.]+)"/)?.[1] ?? "0"),
+    stroke: m[0].match(/stroke="([^"]+)"/)?.[1] ?? "",
+  }));
+}
+
+/**
+ * The route line of path `pi` (the thinner of the two strokes —
+ * the halo is always the wider one), with its colour.
+ */
+function corePath(markup: string, pi: number): { width: number; stroke: string } | null {
+  const paths = [...segment(markup, `ovl-path-${pi}`).matchAll(/<path\b[^>]*>/g)].map((m) => m[0]);
+  if (paths.length === 0) return null;
+  const widths = paths.map((p) => Number(p.match(/stroke-width="([\d.]+)"/)?.[1] ?? "0"));
+  const min = Math.min(...widths);
+  const core = paths[widths.indexOf(min)];
+  return { width: min, stroke: core.match(/stroke="([^"]+)"/)?.[1] ?? "" };
 }
 
 /** Label boxes: <g id="lbl-…" …><rect x= y= width= height= …></g>. */
@@ -222,6 +269,106 @@ t("render is deterministic", render(2) === render(2) && render(-1) === render(-1
 const overview = render(-1);
 t('grouped marker labelled "Miner ×15"', overview.includes(">Miner ×15<"), "expected a single Miner ×15 label");
 t("one marker per group (no swarm)", (overview.match(/<g id="m-\d+"/g) ?? []).length === steps.length);
+
+// ---------------------------------------------------------------------------
+// 4) The tactical-guide redesign: the overlay is an annotation layer
+//    on top of the base — small primitives, a route hierarchy, one
+//    colour per attack group, and the instructions off the map.
+// ---------------------------------------------------------------------------
+
+// -- markers: one small badge per troop group, not a giant icon --
+for (let i = 0; i < steps.length; i++) {
+  const c = markerCircle(overview, i);
+  t(`marker ${i + 1} is compact`, !!c && c.r <= MARKER_R * vb.w + 0.5, `r=${c?.r}`);
+  const badge = circlesIn(overview, `m-${i}`).find((x) => c && x.r < c.r && x.r > 0);
+  t(`marker ${i + 1} carries a compact step badge`,
+    !!badge && badge.r <= BADGE_R * vb.w + 0.5, `r=${badge?.r}`);
+}
+
+// -- spell areas: small, translucent hints, sized per spell --
+for (let i = 0; i < (strategy.spell_actions ?? []).length; i++) {
+  const sp = strategy.spell_actions![i];
+  const area = circlesIn(overview, `ovl-spell-${i}`)[0];
+  const expected = (SPELL_RADIUS[sp.spell] ?? SPELL_DEFAULT_RADIUS) * vb.w;
+  t(`spell ${i + 1} (${sp.spell}) area is small`, !!area && area.r <= expected + 0.5, `r=${area?.r} vs ${expected}`);
+  const fo = Number(segment(overview, `ovl-spell-${i}`).match(/fill-opacity="([\d.]+)"/)?.[1] ?? "1");
+  t(`spell ${i + 1} area is translucent`, fo <= SPELL_FILL_OPACITY + 0.005, `got ${fo}`);
+}
+
+// -- route hierarchy: the push is the thick line, funnels/cleanup quieter --
+const widthsByRole = new Map<string, number>();
+for (let pi = 0; pi < (strategy.paths ?? []).length; pi++) {
+  const p = strategy.paths![pi];
+  const role = pathRole(p.style);
+  const expected = PATH_WEIGHTS[role].core * vb.w;
+  const core = corePath(overview, pi);
+  t(`route ${pi + 1} (${p.style ?? "attack"}) draws at its ${role} weight`,
+    !!core && Math.abs(core.width - expected) < 0.5, `w=${core?.width} vs ${expected}`);
+  widthsByRole.set(role, core?.width ?? 0);
+}
+{
+  const wp = widthsByRole.get("primary");
+  const ws = widthsByRole.get("secondary");
+  const wt = widthsByRole.get("support");
+  t("route hierarchy: primary > secondary > support",
+    wp != null && ws != null && wt != null && wp > ws && ws > wt,
+    [...widthsByRole.entries()].map(([k, v]) => `${k}=${v.toFixed(1)}`).join(" "));
+}
+
+// -- one colour per attack group: marker, label and route agree --
+for (let i = 0; i < steps.length; i++) {
+  const color = phaseColor(phaseIndexOf(steps[i].phase, strategy.attack_phases ?? []));
+  const mb = markerCircle(overview, i);
+  t(`marker ${i + 1} painted in its group colour`, !!mb && mb.stroke === color, `${mb?.stroke} vs ${color}`);
+  const lbl = segment(overview, `lbl-m-${i}`).match(/<rect[^>]*stroke="([^"]+)"/)?.[1];
+  t(`label ${i + 1} painted in its group colour`, lbl === color, `${lbl} vs ${color}`);
+}
+// the overlay's own attribution (0-based) — the raw 1-based `step`
+// refs are renumbered when the validator merges deployment steps.
+const attributed = (strategy.paths ?? []).map((p) => pathStepIndex(p, steps));
+for (let pi = 0; pi < (strategy.paths ?? []).length; pi++) {
+  const si = attributed[pi];
+  if (si == null) continue;
+  const color = phaseColor(phaseIndexOf(steps[si].phase, strategy.attack_phases ?? []));
+  const core = corePath(overview, pi);
+  t(`route ${pi + 1} painted in its group colour`, !!core && core.stroke === color, `${core?.stroke} vs ${color}`);
+}
+
+// -- priority targets: compact glyphs, never big labels --
+t("target glyphs are compact",
+  targetGlyph("town_hall") === "TH" && targetGlyph("eagle_artillery") === "Eagle" &&
+  targetGlyph("air_defense") === "Air Def" && targetGlyph("clan_castle") === "CC");
+t("target glyph keeps an explicit label", targetGlyph("unknown_defense", "Town Hall") === "Town Hall");
+const targetGlyphs = (strategy.base_analysis?.importantTargets ?? []).map((tg) => targetGlyph(tg.type, tg.label));
+t("priority targets render as compact glyphs",
+  targetGlyphs.every((g) => overview.includes(`>${g}<`)), JSON.stringify(targetGlyphs));
+
+// -- the instruction panels carry the plan OFF the map --
+const stepsPanel = renderToStaticMarkup(
+  createElement(StepsNS.AttackStepsPanel, {
+    strategy, activeStep: 1, onSelect: noop, images: {},
+  }),
+);
+t("steps panel: every step listed", steps.every((s) => stepsPanel.includes(`>${s.step}<`)));
+t("steps panel: every unit named",
+  steps.every((s) => stepsPanel.includes(resolveEntity(s.unit)?.ref.name ?? s.unit)));
+t("steps panel: the current step is highlighted", stepsPanel.includes("border-gold/60"));
+t("steps panel: completed steps are subdued", stepsPanel.includes("opacity-45"));
+t("steps panel: future steps stay neutral", stepsPanel.includes("bg-surface-2/20"));
+
+const armyPanel = renderToStaticMarkup(
+  createElement(ArmyNS.AttackArmyPanel, { strategy, images: {} }),
+);
+t("army panel: composition header", armyPanel.includes("Army composition"));
+t("army panel: every troop group listed",
+  strategy.army.troops.every((g) => armyPanel.includes(resolveEntity(g.id)?.ref.name ?? g.id)));
+t("army panel: every spell group listed",
+  strategy.army.spells.every((g) => armyPanel.includes(resolveEntity(g.id)?.ref.name ?? g.id)));
+t("army panel: deployed heroes listed",
+  (strategy.heroes ?? []).filter((h) => h.use).every((h) => armyPanel.includes(resolveEntity(h.id)?.ref.name ?? h.id)));
+t("army panel: siege machine listed",
+  !strategy.army.siege_machine ||
+  armyPanel.includes(resolveEntity(strategy.army.siege_machine.id)?.ref.name ?? ""));
 
 // -- hero decisions: every available hero evaluated, excluded ones explained --
 const TH15_HEROES = ["archer-queen", "barbarian-king", "grand-warden", "royal-champion", "minion-prince", "dragon-duke"];

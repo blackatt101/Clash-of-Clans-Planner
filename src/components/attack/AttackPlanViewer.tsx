@@ -8,6 +8,10 @@
  * The overlay is the single rendering of the strategy JSON; everything here
  * reads positions from the JSON, never invents them.
  *
+ * Layout: the base map is the primary element (top, square stage), and the
+ * instructions live OFF the map — the deployment sequence and the army
+ * composition sit side by side beneath it (stacked on narrow screens).
+ *
  * Coordinate alignment: the base image and the overlay SVG share the SAME
  * box. That box has the image's intrinsic aspect ratio (letterboxed into a
  * square stage), and the overlay's viewBox is built from that same aspect,
@@ -16,8 +20,9 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AttackStrategy, Point } from "@/lib/attack/types";
-import { resolveEntity } from "@/lib/attack/catalog";
 import AttackOverlay, { type OverlayToggles } from "./AttackOverlay";
+import { AttackStepsPanel } from "./AttackStepsPanel";
+import { AttackArmyPanel } from "./AttackArmyPanel";
 import { exportAttackPlan } from "@/lib/attack/export";
 import { AttackLegend } from "./AttackLegend";
 
@@ -250,13 +255,6 @@ export default function AttackPlanViewer({
     return names;
   }, [strategy.deployment_plan]);
 
-  const step = focusedStep >= 0 ? strategy.deployment_plan[focusedStep] : null;
-  const nextStep =
-    focusedStep >= 0 && focusedStep + 1 < strategy.deployment_plan.length
-      ? strategy.deployment_plan[focusedStep + 1]
-      : null;
-  const stepUnitName = step ? (resolveEntity(step.unit)?.ref.name ?? step.unit) : null;
-
   const btn =
     "inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 py-1.5 text-xs font-medium text-ink-dim transition hover:border-gold/50 hover:text-ink";
 
@@ -375,37 +373,23 @@ export default function AttackPlanViewer({
         <AttackLegend />
       </div>
 
-      {/* Step detail */}
-      {step && (
-        <div className="surface-panel card-lit rounded-xl p-3 text-sm">
-          <div className="font-semibold text-gold">
-            Step {step.step} — Deploy {step.count}× {stepUnitName}
-          </div>
-          <div className="mt-0.5 text-[13px] text-ink-dim">
-            Goes toward <b className="text-ink">{step.target ?? "the core"}</b>
-            {" — "}
-            {step.purpose ?? `Phase: ${step.phase}.`}
-          </div>
-          {nextStep ? (
-            <div className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-ink-faint">
-              Next (step {nextStep.step}): deploy{" "}
-              <b className="text-ink-dim">
-                {nextStep.count}×{" "}
-                {resolveEntity(nextStep.unit)?.ref.name ?? nextStep.unit}
-              </b>
-              {nextStep.target ? ` toward ${nextStep.target}` : ""}
-            </div>
-          ) : (
-            <div className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-ink-faint">
-              Final step — attack, then clean up leftovers.
-            </div>
-          )}
-          <div className="mt-1 text-[11px] text-ink-faint">
-            Deploys at {Math.round(step.position.x * 100)}% from left, {Math.round(step.position.y * 100)}% from top.
-            Drag the ① marker on the map to adjust; double-click path points to remove them.
-          </div>
-        </div>
-      )}
+      {/* Instructions — OFF the map: the deployment sequence and the
+          army composition side by side beneath it (stacked on
+          narrow screens), each step speaking in its own words. */}
+      <div className="grid items-start gap-3 lg:grid-cols-2">
+        <AttackStepsPanel
+          strategy={strategy}
+          activeStep={focusedStep}
+          onSelect={(i) => {
+            setActiveStep(i);
+            setActivePhase(null);
+          }}
+          images={images}
+        />
+        <AttackArmyPanel strategy={strategy} images={images} />
+      </div>
+
+      {/* Phase description, when a phase filter is active */}
       {activePhase && (
         <div className="surface-panel card-lit rounded-xl p-3 text-sm">
           <span className="font-semibold capitalize text-gold">{activePhase}:</span>{" "}
