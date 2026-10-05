@@ -1,6 +1,6 @@
 import { BB_BOB_CONTROL, BB_HERO_IDS, SIEGE_MACHINE_IDS } from "./bbRush";
 import type { GameData } from "./staticData";
-import type { ParsedEntry, ParsedVillage } from "./parse";
+import { townHallIdFor, type ParsedEntry, type ParsedVillage } from "./parse";
 import type { Cost, Village, Category } from "./types";
 import { computeMissingBuildings } from "./gameLogic";
 
@@ -561,14 +561,21 @@ export function computeUpgrades(
     // The first row is the item's next step; `chain` carries every step still
     // reachable at this TH/BH so the list can show the climb (13 → 15) and the
     // scheduler can run one copy's steps back-to-back on a single builder.
+    // The village halls are the exception: a TH/BH upgrade is a milestone,
+    // gated on everything else at the current level being maxed, and the
+    // levels it unlocks only become reachable after the upgrade lands — so
+    // the hall plans one step at a time, never a climb to the max.
+    const isVillageHall = e.id === townHallIdFor(e.village);
     const ceiling =
       villageLevel(pv, e.village) == null
         ? data.maxLevel(e.entity)
         : data.maxLevelAt(e.entity, villageLevel(pv, e.village)!);
     const chain: UpgradeOption["chain"] = [];
-    for (const row of e.entity.levels) {
-      if (row.l > next.l && row.l <= ceiling)
-        chain.push({ level: row.l, cost: row.cost, time: row.time });
+    if (!isVillageHall) {
+      for (const row of e.entity.levels) {
+        if (row.l > next.l && row.l <= ceiling)
+          chain.push({ level: row.l, cost: row.cost, time: row.time });
+      }
     }
     opts.push({
       uid: e.uid,
