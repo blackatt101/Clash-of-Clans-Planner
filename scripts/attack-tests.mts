@@ -135,7 +135,7 @@ t('TH8 drops TH16-only spell, keeps available spell',
   r12.strategy.army.spells.length === 1 && r12.strategy.army.spells[0].id === 'rage-spell',
   JSON.stringify(r12.strategy.army.spells));
 const thHero = JSON.parse(JSON.stringify(base));
-thHero.hero_abilities = [{hero:'grand-warden', trigger:'x'}, {hero:'archer-queen', trigger:'x'}]; // GW minTH14
+thHero.hero_abilities = [{hero:'grand-warden', trigger:'x'}, {hero:'archer-queen', trigger:'x'}]; // GW minTH11
 const r13 = validateStrategy(thHero, {townHall: 8});
 t('TH8 drops unavailable hero ability',
   r13.strategy.hero_abilities!.length === 1 && r13.strategy.hero_abilities![0].hero === 'archer-queen',
@@ -284,6 +284,218 @@ t('labels stay inside the viewBox',
 const placedAgain = placeLabels(crowded, crowdObstacles, vb);
 t('label placement is deterministic',
   JSON.stringify(placedAgain.map(p => [p.cx, p.cy])) === JSON.stringify(placed.map(p => [p.cx, p.cy])));
+
+// --- hero decisions -------------------------------------------------------
+// TH11: the four legal heroes are Archer Queen, Barbarian King,
+// Grand Warden and Minion Prince. The ENEMY base is TH15 — hero
+// availability must follow the ATTACKER's TH, never the enemy's.
+const th11 = JSON.parse(JSON.stringify(base));
+th11.base_analysis = { townHallLevel: 15 };
+th11.heroes = [
+  { id: 'archer_queen', use: true, role: 'queen-charge', reason: 'Charges the west compartment.' },
+  { id: 'barbarian-king', use: false, role: null, reason: 'Funnel value already covered by the army composition.' },
+  { id: 'grand-warden', use: true, role: 'main-army-support', reason: 'Warden aura sustains the main push.' },
+  { id: 'minion-prince', use: false, role: null, reason: 'Air defenses are spread; no single compartment to storm.' },
+  { id: 'miner', use: true, role: 'cleanup', reason: 'Not a hero — must be dropped.' },
+  { id: 'royal-champion', use: true, role: 'cleanup', reason: 'TH13 hero — must be dropped at TH11.' },
+  { id: 'dragon-duke', use: true, role: 'air-support', reason: 'TH15 hero — must be dropped at TH11.' },
+];
+const rHero = validateStrategy(th11, { townHall: 11 });
+t('TH11: exactly the four legal heroes kept',
+  rHero.strategy.heroes?.length === 4 &&
+    rHero.strategy.heroes?.every((h) =>
+      h.id === 'archer-queen' || h.id === 'barbarian-king' ||
+      h.id === 'grand-warden' || h.id === 'minion-prince') === true,
+  JSON.stringify(rHero.strategy.heroes?.map((h) => h.id)));
+t('TH11: Grand Warden legal (unlocks at TH11)',
+  rHero.strategy.heroes?.some((h) => h.id === 'grand-warden') === true);
+t('TH11: Minion Prince legal (unlocks at TH9)',
+  rHero.strategy.heroes?.some((h) => h.id === 'minion-prince') === true);
+t('TH11: Royal Champion dropped (TH13 hero — attacker TH gates, not enemy TH)',
+  rHero.strategy.heroes?.some((h) => h.id === 'royal-champion') !== true);
+t('TH11: hero slug alias resolves', rHero.strategy.heroes?.[0]?.id === 'archer-queen');
+t('TH11: selected hero keeps role', rHero.strategy.heroes?.[0]?.role === 'queen-charge');
+t('TH11: excluded hero keeps its explanation',
+  rHero.strategy.heroes?.[1]?.reason === 'Funnel value already covered by the army composition.');
+t('TH11: two of the four legal heroes selected',
+  (rHero.strategy.heroes?.filter((h) => h.use).length ?? 0) === 2);
+
+// TH15: six heroes available, three strategically useful.
+const th15 = JSON.parse(JSON.stringify(base));
+th15.heroes = [
+  { id: 'archer-queen', use: true, role: 'queen-charge', reason: 'Queen charge opens the west.' },
+  { id: 'barbarian-king', use: true, role: 'funnel', reason: 'King funnels the south entry.' },
+  { id: 'grand-warden', use: true, role: 'main-army-support', reason: 'Warden aura sustains the main push.' },
+  { id: 'royal-champion', use: false, role: null, reason: 'Cleanup is covered by the CC troops.' },
+  { id: 'minion-prince', use: false, role: null, reason: 'No single air compartment to storm.' },
+  { id: 'dragon-duke', use: false, role: null, reason: 'The air main is already covered by the balloon screen.' },
+];
+const rHero15 = validateStrategy(th15, { townHall: 15 });
+t('TH15: all six available heroes evaluated', rHero15.strategy.heroes?.length === 6);
+t('TH15: three heroes selected (no 2-hero default)',
+  (rHero15.strategy.heroes?.filter((h) => h.use).length ?? 0) === 3);
+t('TH15: Grand Warden not ignored',
+  rHero15.strategy.heroes?.some((h) => h.id === 'grand-warden' && h.use === true) === true);
+t('TH15: every excluded hero has a reason',
+  rHero15.strategy.heroes?.filter((h) => !h.use).every((h) => (h.reason ?? '').length > 0) === true);
+
+// Hero unlock Town Halls, gated by the ATTACKER's TH:
+// King TH7, Queen TH8, Minion Prince TH9, Warden TH11,
+// Champion TH13, Dragon Duke TH15.
+const unlocks = JSON.parse(JSON.stringify(base));
+unlocks.heroes = [
+  { id: 'barbarian-king', use: false, role: null, reason: 'King.' },
+  { id: 'archer-queen', use: false, role: null, reason: 'Queen.' },
+  { id: 'minion-prince', use: false, role: null, reason: 'Prince.' },
+  { id: 'grand-warden', use: false, role: null, reason: 'Warden.' },
+  { id: 'royal-champion', use: false, role: null, reason: 'Champion.' },
+  { id: 'dragon-duke', use: false, role: null, reason: 'Duke.' },
+];
+const unlockIds = (th: number): string[] =>
+  (validateStrategy(JSON.parse(JSON.stringify(unlocks)), { townHall: th }).strategy.heroes ?? []).map((h) => h.id);
+t('unlock: TH7 -> Barbarian King only',
+  JSON.stringify(unlockIds(7)) === '["barbarian-king"]', JSON.stringify(unlockIds(7)));
+t('unlock: TH8 -> + Archer Queen',
+  JSON.stringify(unlockIds(8)) === '["barbarian-king","archer-queen"]', JSON.stringify(unlockIds(8)));
+t('unlock: TH9 -> + Minion Prince',
+  JSON.stringify(unlockIds(9)) === '["barbarian-king","archer-queen","minion-prince"]', JSON.stringify(unlockIds(9)));
+t('unlock: TH11 -> + Grand Warden',
+  JSON.stringify(unlockIds(11)) === '["barbarian-king","archer-queen","minion-prince","grand-warden"]', JSON.stringify(unlockIds(11)));
+t('unlock: TH13 -> + Royal Champion',
+  JSON.stringify(unlockIds(13)) === '["barbarian-king","archer-queen","minion-prince","grand-warden","royal-champion"]', JSON.stringify(unlockIds(13)));
+t('unlock: TH15 -> + Dragon Duke (all six)',
+  JSON.stringify(unlockIds(15)) === '["barbarian-king","archer-queen","minion-prince","grand-warden","royal-champion","dragon-duke"]', JSON.stringify(unlockIds(15)));
+
+// Battlefield slots (game rule): one opens every two
+// Town Halls from TH7 (TH9: 2, TH11: 3, TH13: 4,
+// TH15: 5). At TH15 the model selected all six — the
+// sixth is excluded with the limit as its reason, and
+// its deployment step, path and ability are dropped so
+// the visual plan never shows a hero that is not brought.
+const cap = JSON.parse(JSON.stringify(base));
+cap.heroes = [
+  { id: 'archer-queen', use: true, role: 'queen-charge', reason: 'Queen charge opens the west.' },
+  { id: 'barbarian-king', use: true, role: 'funnel', reason: 'King funnels the south entry.' },
+  { id: 'grand-warden', use: true, role: 'main-army-support', reason: 'Warden aura sustains the push.' },
+  { id: 'minion-prince', use: true, role: 'air-support', reason: 'Prince storms the air compartment.' },
+  { id: 'royal-champion', use: true, role: 'cleanup', reason: 'Champion cleans the north-east.' },
+  { id: 'dragon-duke', use: true, role: 'air-support', reason: 'Duke soars over the core.' },
+];
+cap.deployment_plan.push({ step: 3, phase: 'air', unit: 'dragon-duke', count: 1, position: { x: 0.6, y: 0.4 } });
+cap.paths.push({ step: 3, unit: 'dragon-duke', points: [{ x: 0.6, y: 0.4 }, { x: 0.7, y: 0.35 }], style: 'attack' });
+cap.hero_abilities = [{ hero: 'dragon-duke', trigger: 'When the duke reaches the core', purpose: 'Soar over the core.' }];
+const rCap = validateStrategy(cap, { townHall: 15 });
+t('cap: TH15 keeps the first five selected heroes',
+  (rCap.strategy.heroes?.filter((h) => h.use).length ?? 0) === 5);
+t('cap: sixth hero excluded with the limit as its reason',
+  rCap.strategy.heroes?.find((h) => h.id === 'dragon-duke')?.reason
+    === 'Battlefield limit: at most 5 heroes can be deployed per attack.');
+t('cap: excluded hero has no role',
+  rCap.strategy.heroes?.find((h) => h.id === 'dragon-duke')?.role === null);
+t('cap: warning records the limit',
+  rCap.warnings.some((w) => /exceeds the 5-hero battlefield limit/.test(w)));
+t('cap: over-limit hero deployment step dropped',
+  rCap.strategy.deployment_plan.every((s) => s.unit !== 'dragon-duke'));
+t('cap: over-limit hero path dropped',
+  (rCap.strategy.paths ?? []).every((p) => p.unit !== 'dragon-duke'));
+t('cap: over-limit hero ability dropped',
+  (rCap.strategy.hero_abilities ?? []).every((a) => a.hero !== 'dragon-duke'));
+
+// The 2-slot tier: at TH9 only two heroes fit the
+// battlefield, so the third selected hero is excluded.
+const cap9 = JSON.parse(JSON.stringify(base));
+cap9.heroes = [
+  { id: 'barbarian-king', use: true, role: 'funnel', reason: 'King funnels.' },
+  { id: 'archer-queen', use: true, role: 'queen-charge', reason: 'Queen charges.' },
+  { id: 'minion-prince', use: true, role: 'air-support', reason: 'Prince storms.' },
+];
+cap9.deployment_plan.push({ step: 3, phase: 'air', unit: 'minion-prince', count: 1, position: { x: 0.6, y: 0.4 } });
+const rCap9 = validateStrategy(cap9, { townHall: 9 });
+t('cap: TH9 keeps the first two selected heroes',
+  (rCap9.strategy.heroes?.filter((h) => h.use).length ?? 0) === 2);
+t('cap: TH9 third hero excluded with the 2-hero reason',
+  rCap9.strategy.heroes?.find((h) => h.id === 'minion-prince')?.reason
+    === 'Battlefield limit: at most 2 heroes can be deployed per attack.');
+
+// The same rule at TH11: three slots, so the fourth
+// selected hero is excluded with the three-hero reason.
+
+// The same rule at TH11: the limit is three, so the fourth
+// selected hero is excluded with the three-hero reason.
+const cap11 = JSON.parse(JSON.stringify(base));
+cap11.heroes = [
+  { id: 'archer-queen', use: true, role: 'queen-charge', reason: 'Queen charge opens the west.' },
+  { id: 'barbarian-king', use: true, role: 'funnel', reason: 'King funnels the south entry.' },
+  { id: 'grand-warden', use: true, role: 'main-army-support', reason: 'Warden aura sustains the push.' },
+  { id: 'minion-prince', use: true, role: 'air-support', reason: 'Prince storms the air compartment.' },
+];
+cap11.deployment_plan.push({ step: 3, phase: 'air', unit: 'minion-prince', count: 1, position: { x: 0.6, y: 0.4 } });
+const rCap11 = validateStrategy(cap11, { townHall: 11 });
+t('cap: TH11 keeps the first three selected heroes',
+  (rCap11.strategy.heroes?.filter((h) => h.use).length ?? 0) === 3);
+t('cap: TH11 fourth hero excluded with the 3-hero reason',
+  rCap11.strategy.heroes?.find((h) => h.id === 'minion-prince')?.reason
+    === 'Battlefield limit: at most 3 heroes can be deployed per attack.');
+t('cap: TH11 over-limit hero deployment step dropped',
+  rCap11.strategy.deployment_plan.every((s) => s.unit !== 'minion-prince'));
+
+// Boundary: the fourth battlefield slot opens at TH13.
+// Five heroes are legal at TH13 (Champion included), but
+// only four fit — the fifth selected hero is excluded.
+const cap13 = JSON.parse(JSON.stringify(base));
+cap13.heroes = [
+  { id: 'archer-queen', use: true, role: 'queen-charge', reason: 'Queen charge.' },
+  { id: 'barbarian-king', use: true, role: 'funnel', reason: 'King funnels.' },
+  { id: 'grand-warden', use: true, role: 'main-army-support', reason: 'Warden aura.' },
+  { id: 'minion-prince', use: true, role: 'air-support', reason: 'Prince storms.' },
+  { id: 'royal-champion', use: true, role: 'cleanup', reason: 'Champion cleans up.' },
+];
+const rCap13 = validateStrategy(cap13, { townHall: 13 });
+t('cap: TH13 boundary keeps four of five selected heroes',
+  (rCap13.strategy.heroes?.filter((h) => h.use).length ?? 0) === 4);
+t('cap: TH13 fifth hero excluded with the 4-hero reason',
+  rCap13.strategy.heroes?.find((h) => h.id === 'royal-champion')?.reason
+    === 'Battlefield limit: at most 4 heroes can be deployed per attack.');
+
+// Backfill: the model evaluated only two of the six TH15 heroes.
+const forgot = JSON.parse(JSON.stringify(base));
+forgot.heroes = [
+  { id: 'archer-queen', use: true, role: 'queen-charge', reason: 'Queen charge opens the west.' },
+  { id: 'barbarian-king', use: false, role: null, reason: 'Funnel covered.' },
+];
+const rForgot = validateStrategy(forgot, { townHall: 15 });
+t('backfill: unevaluated heroes still listed', rForgot.strategy.heroes?.length === 6);
+t('backfill: skipped hero is visibly "not considered"',
+  rForgot.strategy.heroes?.find((h) => h.id === 'grand-warden')?.reason === 'Not considered by the planner.');
+
+// Backfill: a hero the model deployed but forgot to decide.
+const deployed = JSON.parse(JSON.stringify(base));
+deployed.deployment_plan.push({
+  step: 3, phase: 'core', unit: 'grand-warden', count: 1, position: { x: 0.5, y: 0.5 },
+});
+deployed.heroes = [{ id: 'archer-queen', use: true, role: 'queen-charge', reason: 'Queen charge.' }];
+const rDep = validateStrategy(deployed, { townHall: 15 });
+t('backfill: deployed hero listed as selected',
+  rDep.strategy.heroes?.find((h) => h.id === 'grand-warden')?.use === true);
+
+// Repairs for missing fields.
+const rep = JSON.parse(JSON.stringify(base));
+rep.heroes = [
+  { id: 'archer-queen', use: true },
+  { id: 'barbarian-king', use: false },
+];
+const rRep = validateStrategy(rep, { townHall: 15 });
+t('repair: used hero without role defaults to support',
+  rRep.strategy.heroes?.find((h) => h.id === 'archer-queen')?.role === 'support');
+t('repair: excluded hero without reason gets one',
+  (rRep.strategy.heroes?.find((h) => h.id === 'barbarian-king')?.reason ?? '').length > 0);
+
+// A used hero that is never deployed cannot render — warned.
+const noDep = JSON.parse(JSON.stringify(base));
+noDep.heroes = [{ id: 'grand-warden', use: true, role: 'main-army-support', reason: 'Aura support.' }];
+const rNoDep = validateStrategy(noDep, { townHall: 15 });
+t('warning: used hero with no deployment or ability',
+  rNoDep.warnings.some((w) => /marked used but has no deployment/.test(w)));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -22,7 +22,7 @@ for (const f of troopFiles) {
 for (const f of fs.readdirSync(`${base}/heroes`).filter(f => f.endsWith('.json'))) {
   const it = load('heroes', f); if (!it) continue;
   // hero level rows have no townHallRequired in CDT; use game knowledge
-  const thMap = { 'barbarian-king': 7, 'archer-queen': 7, 'grand-warden': 14, 'royal-champion': 15, 'minion-prince': 15, 'dragon-duke': 18 };
+  const thMap = { 'barbarian-king': 7, 'archer-queen': 8, 'minion-prince': 9, 'grand-warden': 11, 'royal-champion': 13, 'dragon-duke': 15 };
   catalog.heroes[it.id] = { id: it.id, dataId: it.dataId, name: it.name, minTH: thMap[it.id] ?? minTH(it) };
 }
 for (const f of fs.readdirSync(`${base}/spells`).filter(f => f.endsWith('.json'))) {
@@ -76,15 +76,60 @@ const ccExcluded = null; // replaced by allow list
 
 // heroes/pets/guardians are structurally CC-excluded (separate categories)
 
-// per-TH capacities (game constants)
-const capacities = {
-  armyHousing: [16, 18, 20, 22, 25, 30, 35, 40, 45, 50, 55, 58, 60, 62, 65, 70, 75, 80],        // TH1..18
-  spellHousing: [1, 2, 2, 2, 2, 3, 4, 4, 4, 4, 4, 5, 6, 6, 7, 7, 8, 8],                          // TH1..18
-  ccTroop:      [10, 15, 20, 25, 30, 35, 35, 40, 45, 45, 50, 50, 55, 55],                         // CC L1..14 (TH3..18)
-  ccSpell:      [0, 0, 0, 0, 0, 1, 2, 2, 2, 3, 3, 3, 3, 4],
-  ccSiege:      [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2],
-  ccLevelForTH: { 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: 10, 13: 11, 14: 12, 15: 13, 16: 13, 17: 14, 18: 14 },
+// per-TH capacities — DERIVED FROM CDT BUILDING DATA (not hand-typed):
+//   army  = army-camp count at this TH × max camp level's housingSpace
+//   spell = spell-factory storage + dark-spell-factory storage (max level)
+//   CC    = clan-castle level maxed for this TH -> its troop/spell/siege caps
+// CDT is this repo's source of truth; the previous hand-typed table had
+// drifted badly (e.g. TH15: 65/7 vs the real 320/11).
+function maxLevelFor(levels, th) {
+  let best = 0;
+  for (const l of levels) if ((l.townHallRequired ?? 1) <= th && l.level > best) best = l.level;
+  return best;
+}
+function perTH(available) {
+  const out = [];
+  let c = 0;
+  for (let th = 1; th <= 18; th++) {
+    const e = available.find((x) => x.townHallLevel === th);
+    if (e) c = e.count;
+    out.push(c);
+  }
+  return out;
+}
+const campData = load('army-buildings', 'army-camp.json');
+const sfData = load('army-buildings', 'spell-factory.json');
+const dsfData = load('army-buildings', 'dark-spell-factory.json');
+const ccData = load('resource-buildings', 'clan-castle.json');
+
+const campCount = perTH(campData.availablePerTownHall);
+const sfCount = perTH(sfData.availablePerTownHall);
+const dsfCount = perTH(dsfData.availablePerTownHall);
+
+const storageOf = (data, th) => {
+  const lvl = maxLevelFor(data.levels, th);
+  if (!lvl) return 0;
+  return data.levels.find((l) => l.level === lvl).spellStorageCapacity ?? 0;
 };
+
+const capacities = {
+  armyHousing: [],
+  spellHousing: [],
+  ccTroop: ccData.levels.map((l) => l.troopCapacity ?? 0), // CC L1..14
+  ccSpell: ccData.levels.map((l) => l.spellCapacity ?? 0),
+  ccSiege: ccData.levels.map((l) => l.siegeMachineCapacity ?? 0),
+  ccLevelForTH: {},
+};
+for (let th = 1; th <= 18; th++) {
+  const campLvl = maxLevelFor(campData.levels, th);
+  const camp = campData.levels.find((l) => l.level === campLvl);
+  capacities.armyHousing.push((campCount[th - 1] ?? 0) * (camp?.housingSpace ?? 0));
+  capacities.spellHousing.push(
+    (sfCount[th - 1] ?? 0) * storageOf(sfData, th) +
+      (dsfCount[th - 1] ?? 0) * storageOf(dsfData, th),
+  );
+  capacities.ccLevelForTH[th] = maxLevelFor(ccData.levels, th);
+}
 
 const out = `// GENERATED from coc-data-test (CDT) home-village catalog — do not hand-edit.
 // Regenerate: node scripts/gen_attack_catalog.mjs

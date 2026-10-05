@@ -87,6 +87,24 @@ export interface HeroAbility {
   purpose?: string;
 }
 
+/**
+ * The planner's per-hero decision. Covers EVERY hero available
+ * at the attacker's Town Hall — selected heroes carry a role,
+ * excluded heroes carry the reason they were left out. The
+ * decision is the model's (strategy + base + role value), not
+ * a fixed count: two, three or all heroes may be right.
+ */
+export interface HeroDecision {
+  /** Canonical hero slug (e.g. "archer-queen"). */
+  id: string;
+  /** Whether the hero is deployed for this attack. */
+  use: boolean;
+  /** Role the hero fills (null when not used). */
+  role: string | null;
+  /** Why the hero is used — or, when excluded, why not. */
+  reason: string;
+}
+
 export interface AttackPhase {
   phase: number;
   name: string;
@@ -162,6 +180,8 @@ export interface AttackStrategy {
   };
   base_analysis?: BaseAnalysis;
   deployment_plan: DeploymentStep[];
+  /** Per-hero decisions for every hero available at the attacker's TH. */
+  heroes?: HeroDecision[];
   paths?: TroopPath[];
   spell_actions?: SpellAction[];
   hero_abilities?: HeroAbility[];

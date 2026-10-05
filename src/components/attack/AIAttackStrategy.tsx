@@ -528,6 +528,35 @@ function ResultView({
             </li>
           ))}
         </ol>
+        {strategy.heroes?.length ? (
+          <div className="mt-3 border-t border-line pt-3">
+            <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+              Hero decisions
+            </h4>
+            <ul className="flex flex-col gap-1.5 text-[13px] text-ink-dim">
+              {strategy.heroes.map((h) => (
+                <li key={h.id} className="flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0">{iconOf(h.id, "h-5 w-5")}</span>
+                  <span className="min-w-0">
+                    <b className="text-ink">{resolveEntity(h.id)?.ref.name ?? h.id}</b>
+                    {h.use ? (
+                      <span className="ml-1.5 rounded-full bg-gold/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gold">
+                        {h.role ?? "support"}
+                      </span>
+                    ) : (
+                      <span className="ml-1.5 text-[11px] uppercase tracking-wide text-ink-faint">
+                        not selected
+                      </span>
+                    )}
+                    {h.reason ? (
+                      <span className="text-ink-faint"> — {h.reason}</span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {strategy.hero_abilities?.length ? (
           <div className="mt-3 border-t border-line pt-3">
             <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">

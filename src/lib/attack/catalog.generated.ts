@@ -265,7 +265,7 @@ export const HEROES: Record<string, EntityRef> = {
     "id": "archer-queen",
     "dataId": 28000001,
     "name": "Archer Queen",
-    "minTH": 7
+    "minTH": 8
   },
   "barbarian-king": {
     "id": "barbarian-king",
@@ -277,25 +277,25 @@ export const HEROES: Record<string, EntityRef> = {
     "id": "dragon-duke",
     "dataId": 28000007,
     "name": "Dragon Duke",
-    "minTH": 18
+    "minTH": 15
   },
   "grand-warden": {
     "id": "grand-warden",
     "dataId": 28000002,
     "name": "Grand Warden",
-    "minTH": 14
+    "minTH": 11
   },
   "minion-prince": {
     "id": "minion-prince",
     "dataId": 28000006,
     "name": "Minion Prince",
-    "minTH": 15
+    "minTH": 9
   },
   "royal-champion": {
     "id": "royal-champion",
     "dataId": 28000004,
     "name": "Royal Champion",
-    "minTH": 15
+    "minTH": 13
   }
 };
 export const SPELLS: Record<string, EntityRef> = {
@@ -607,44 +607,44 @@ export const CC_ELIGIBLE = new Set<string>([
 
 export const CAPACITIES = {
   "armyHousing": [
-    16,
-    18,
     20,
-    22,
-    25,
     30,
-    35,
-    40,
-    45,
-    50,
-    55,
-    58,
-    60,
-    62,
-    65,
     70,
-    75,
-    80
+    80,
+    135,
+    150,
+    200,
+    200,
+    220,
+    240,
+    260,
+    280,
+    300,
+    300,
+    320,
+    320,
+    340,
+    352
   ],
   "spellHousing": [
-    1,
+    0,
+    0,
+    0,
+    0,
     2,
-    2,
-    2,
-    2,
-    3,
     4,
-    4,
-    4,
-    4,
-    4,
-    5,
-    6,
     6,
     7,
-    7,
-    8,
-    8
+    9,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11
   ],
   "ccTroop": [
     10,
@@ -666,8 +666,8 @@ export const CAPACITIES = {
     0,
     0,
     0,
-    0,
-    0,
+    1,
+    1,
     1,
     2,
     2,
@@ -682,8 +682,8 @@ export const CAPACITIES = {
     0,
     0,
     0,
-    1,
-    1,
+    0,
+    0,
     1,
     1,
     1,
@@ -695,21 +695,23 @@ export const CAPACITIES = {
     2
   ],
   "ccLevelForTH": {
+    "1": 0,
+    "2": 0,
     "3": 1,
     "4": 2,
-    "5": 3,
-    "6": 4,
-    "7": 5,
-    "8": 6,
-    "9": 7,
-    "10": 8,
-    "11": 9,
-    "12": 10,
-    "13": 11,
-    "14": 12,
-    "15": 13,
-    "16": 13,
-    "17": 14,
+    "5": 2,
+    "6": 3,
+    "7": 3,
+    "8": 4,
+    "9": 5,
+    "10": 6,
+    "11": 7,
+    "12": 8,
+    "13": 9,
+    "14": 10,
+    "15": 11,
+    "16": 12,
+    "17": 13,
     "18": 14
   }
 };

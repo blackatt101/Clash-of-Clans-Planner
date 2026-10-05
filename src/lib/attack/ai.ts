@@ -26,7 +26,7 @@ import type {
   ChatCompletionMessageParam,
 } from "openai/resources/chat/completions/completions";
 import { HEROES, SIEGE, SPELLS, TROOPS } from "./catalog.generated";
-import { capacitiesForTH } from "./catalog";
+import { capacitiesForTH, heroBattlefieldLimit } from "./catalog";
 import type { AttackRequest, AttackStrategy } from "./types";
 
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
@@ -53,6 +53,7 @@ const OUTPUT_SCHEMA_HINT = `{
     "entryPoints": [{"position": {"x":0.2,"y":0.8}, "reason": "..."}],
     "funnels": [{"position": {"x":0.2,"y":0.75}, "purpose": "..."}]
   },
+  "heroes": [{"id": "archer-queen", "use": true, "role": "queen-charge", "reason": "..."}, {"id": "grand-warden", "use": false, "role": null, "reason": "..."}],
   "deployment_plan": [
     {"step": 1, "phase": "queen-charge", "unit": "archer-queen", "count": 1,
      "position": {"x":0.2,"y":0.8}, "target": "western compartment", "purpose": "...",
@@ -73,6 +74,9 @@ export function buildSystemPrompt(request: AttackRequest): string {
   // housing means; the validator is the real enforcement point.
   const caps = capacitiesForTH(request.townHall);
   const maxTroopTH = request.townHall;
+  // Battlefield hero slots (game rule): one opens every
+  // two Town Halls from TH7 (TH9: 2, TH11: 3, TH13: 4, TH15: 5).
+  const heroLimit = heroBattlefieldLimit(maxTroopTH);
   const troops = Object.values(TROOPS)
     .filter((t) => (t.minTH ?? 1) <= maxTroopTH)
     .map((t) => `${t.id}:${t.housing}`);
@@ -144,6 +148,29 @@ export function buildSystemPrompt(request: AttackRequest): string {
     "should end up, e.g. the core). Do not trace the route building by building.",
     "SPELL ACTIONS: each carries `step` — the 1-based step at which the spell is cast — plus its",
     "normalized position and an event-based trigger.",
+    "HERO EVALUATION: the heroes listed above are the ones YOUR",
+    "Town Hall makes available — every one of them is deployable",
+    "at your Town Hall, so never claim one is unavailable.",
+    "Evaluate EVERY one of them",
+    "independently — never default to exactly two heroes, and never",
+    "take them all automatically.",
+    `Battlefield rule: at most ${heroLimit} heroes can be deployed per attack.`,
+    `When more than ${heroLimit} would add value, pick the ${heroLimit} with the most`,
+    "strategic value for THIS base and THIS strategy, and explain",
+    "why each remaining hero stays out.",
+    "For each available hero decide from: the attack strategy, the base",
+    "layout (compartments, air defenses, funnels, CC position, enemy",
+    "heroes), the role it can fill (queen-charge, funnel, main-army-support,",
+    "core-support, air-support, cleanup, tanking, defensive-building-removal),",
+    "and whether it gives meaningful strategic value over the troops",
+    "already planned.",
+    "Output a `heroes` array covering EVERY available hero with",
+    "{id, use, role, reason}. A used hero needs a role; an excluded hero",
+    "NEEDS a reason (e.g. \"this strategy already has sufficient funnel value",
+    "and the hero provides less value than the selected support hero\").",
+    "Every hero marked use:true MUST also appear in the deployment_plan",
+    "(its own step or a split deployment) so the visual plan renders it.",
+    "Hero availability comes from YOUR Town Hall, never from the enemy's.",
     "HERO ABILITIES: when/why to activate — use event-based triggers, not fake exact timings",
     '(e.g. "when the Queen reaches the compartment", not "at 17 seconds").',
     "Phases: split the attack into meaningful steps (Funnel / Queen Charge / Main Entry / Core / Cleanup).",

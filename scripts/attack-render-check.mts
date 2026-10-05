@@ -222,6 +222,18 @@ const overview = render(-1);
 t('grouped marker labelled "Miner ×15"', overview.includes(">Miner ×15<"), "expected a single Miner ×15 label");
 t("one marker per group (no swarm)", (overview.match(/<g id="m-\d+"/g) ?? []).length === steps.length);
 
+// -- hero decisions: every available hero evaluated, excluded ones explained --
+const TH15_HEROES = ["archer-queen", "barbarian-king", "grand-warden", "royal-champion", "minion-prince", "dragon-duke"];
+t("hero decisions cover every available hero",
+  TH15_HEROES.every((id) => strategy.heroes?.some((h) => h.id === id)),
+  JSON.stringify(strategy.heroes?.map((h) => h.id)));
+t("selected heroes have roles",
+  (strategy.heroes ?? []).filter((h) => h.use).every((h) => (h.role ?? "").length > 0));
+t("excluded heroes have explanations",
+  (strategy.heroes ?? []).filter((h) => !h.use).every((h) => (h.reason ?? "").length > 0));
+t("selected heroes are deployed in the visual plan",
+  (strategy.heroes ?? []).filter((h) => h.use).every((h) => steps.some((s) => s.unit === h.id)));
+
 // -- spell relevance from the spec example: Heal at step 6 absent at step 1 --
 t("heal circle absent during step 1", !render(0).includes(`ovl-spell-${spellStep.findIndex((s) => s === 6)}`));
 

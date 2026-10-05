@@ -21,15 +21,42 @@ export type { EntityRef };
 
 export type EntityKind = "troop" | "hero" | "spell" | "siege" | "unknown";
 
+/** Fold a slug to its canonical shape: lowercase, hyphen-separated. */
+function normSlug(s: string): string {
+  // Underscores are the spec's own id form ("archer_queen") and a
+  // common model output, so they fold to the canonical hyphen.
+  return s.toLowerCase().replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** Alias table re-keyed by normalized slug, so "battle_blmp" and
+ *  "battle-blmp" hit the same entry. */
+const ALIASES: Record<string, string> = {};
+for (const [k, v] of Object.entries(SLUG_ALIASES)) {
+  const nk = normSlug(k);
+  if (nk) ALIASES[nk] = v;
+}
+
 /** Normalize an AI/unit slug to the canonical form, or null if unknown. */
 export function resolveSlug(input: string): string | null {
-  const raw = String(input ?? "").trim().toLowerCase().replace(/[\s-]+/g, "-");
+  const raw = normSlug(String(input ?? "").trim());
   if (!raw) return null;
   // Exact canonical match in any table.
   if (TROOPS[raw] || SPELLS[raw] || SIEGE[raw] || HEROES[raw]) return raw;
-  // Alias table (task-spec names like "queen", "hog_rider" already
-  // hyphen-normalized above, plus spell suffix stripping).
-  return SLUG_ALIASES[raw] ?? null;
+  // Alias table (task-spec names like "queen", misspellings such as
+  // "battle_blmp", plus spell suffix stripping).
+  return ALIASES[raw] ?? null;
+}
+
+/**
+ * Battlefield hero slots by Town Hall: the first slot opens
+ * at TH7 and another opens every two Town Halls (TH9: 2,
+ * TH11: 3, TH13: 4, TH15: 5, TH17: 6 — all six heroes).
+ * The AI chooses which heroes fill the slots; the validator
+ * enforces the count.
+ */
+export function heroBattlefieldLimit(th: number): number {
+  if (th < 7) return 0;
+  return Math.min(1 + Math.floor((th - 7) / 2), 6);
 }
 
 /** Full entity lookup by slug or alias; unknown ids return null. */

@@ -16,17 +16,28 @@
  *    "Miner ×15" marker instead of a swarm of icons
  *  - paths / spell actions -> carry the 1-based deployment step they
  *    belong to (out-of-range references are dropped, not trusted)
+ *  - hero decisions -> gated by the ATTACKER's Town Hall; every
+ *    available hero the model skipped is backfilled into the
+ *    decision list (never silently ignored); used heroes need a
+ *    role, excluded heroes need a reason (repaired when missing);
+ *    the battlefield hero slots (one opens every two Town Halls
+ *    from TH7: TH9=2, TH11=3, TH13=4, TH15=5) are enforced —
+ *    extras are excluded with the limit as their reason, and
+ *    their deployment steps / paths / abilities are dropped
  */
 import {
+  heroBattlefieldLimit,
   resolveEntity,
   resolveSlug,
   capacitiesForTH,
   isCcEligible,
 } from "./catalog";
+import { HEROES } from "./catalog.generated";
 import type {
   ArmyConstraints,
   AttackStrategy,
   DeploymentStep,
+  HeroDecision,
   Point,
   ValidationResult,
 } from "./types";
@@ -233,6 +244,104 @@ export function validateStrategy(
   fitToCapacity(spells, spellHousing, "Spell", warnings);
   fitToCapacity(ccTroops, ccTroopCap, "Clan Castle", warnings);
 
+  // ---- hero decisions ----
+  // The model must consider EVERY hero available at the attacker's
+  // Town Hall and decide use + role + reason per hero. Entries are
+  // gated by the ATTACKER's TH (never the enemy's, which lives in
+  // base_analysis). Heroes the model forgot are backfilled from the
+  // catalog so an available hero can never silently disappear from
+  // the decision list. Parsed before the deployment plan so the
+  // final decisions can gate deployment steps, paths and abilities.
+  const deployedHeroes = new Set<string>(
+    asArray(rawObj.deployment_plan)
+      .map((d) => resolveSlug(d?.unit))
+      .filter((s): s is string => s != null && resolveEntity(s)?.kind === "hero"),
+  );
+  const abilityHeroes = new Set<string>(
+    asArray(rawObj.hero_abilities)
+      .map((h) => resolveSlug(h?.hero))
+      .filter((s): s is string => s != null),
+  );
+  const heroes: HeroDecision[] = [];
+  const seenHeroes = new Set<string>();
+  for (const h of asArray(rawObj.heroes)) {
+    const id = resolveSlug(h?.id);
+    if (id == null || resolveEntity(id)?.kind !== "hero") {
+      warnings.push(`Hero decision for "${String(h?.id ?? "")}" is not a known hero; dropped.`);
+      continue;
+    }
+    if (!thAvailable(id, constraints.townHall)) {
+      warnings.push(`Hero decision for "${id}" not available at TH${constraints.townHall}; dropped.`);
+      continue;
+    }
+    if (seenHeroes.has(id)) continue; // first entry wins
+    seenHeroes.add(id);
+    const use = h?.use === true;
+    let role = typeof h?.role === "string" ? h.role.trim().slice(0, 80) : "";
+    let reason = typeof h?.reason === "string" ? h.reason.trim().slice(0, 240) : "";
+    if (use && !role) {
+      role = "support";
+      warnings.push(`Hero "${id}" is used without a role; defaulted to "support".`);
+    }
+    if (!use && !reason) {
+      reason = "Not selected for this attack.";
+      warnings.push(`Hero "${id}" excluded without a reason; added a placeholder.`);
+    }
+    heroes.push({ id, use, role: use ? role : null, reason });
+  }
+  // Backfill every available hero the model did not evaluate. A hero
+  // the model deployed anyway counts as selected; anything else is
+  // listed as excluded — with the reason made explicit, so an
+  // overlooked hero is visible instead of silent.
+  for (const slug of Object.values(HEROES).map((h) => h.id)) {
+    if (seenHeroes.has(slug) || !thAvailable(slug, constraints.townHall)) continue;
+    const used = deployedHeroes.has(slug) || abilityHeroes.has(slug);
+    warnings.push(
+      `Hero "${slug}" is available at TH${constraints.townHall} but was not evaluated; listed as ${used ? "selected" : "not selected"}.`,
+    );
+    heroes.push(
+      used
+        ? { id: slug, use: true, role: "support", reason: "Selected by the deployment plan." }
+        : { id: slug, use: false, role: null, reason: "Not considered by the planner." },
+    );
+  }
+  // Battlefield rule: at most 3 heroes may be deployed per
+  // attack up to TH12, and 4 from TH13. When the model selects
+  // more, the first ones (its own priority order) stay and the
+  // rest are excluded — the limit is the exclusion reason, and
+  // their deployment steps, paths and abilities are dropped
+  // below so the visual plan never shows a hero that is not
+  // brought.
+  const heroLimit = heroBattlefieldLimit(constraints.townHall);
+  const selectedHeroes = heroes.filter((d) => d.use);
+  if (selectedHeroes.length > heroLimit) {
+    const kept = new Set(selectedHeroes.slice(0, heroLimit).map((d) => d.id));
+    for (const d of heroes) {
+      if (d.use && !kept.has(d.id)) {
+        warnings.push(
+          `Hero "${d.id}" exceeds the ${heroLimit}-hero battlefield limit; listed as not selected.`,
+        );
+        d.use = false;
+        d.role = null;
+        d.reason = `Battlefield limit: at most ${heroLimit} heroes can be deployed per attack.`;
+      }
+    }
+  }
+  /** True when the hero is available but not selected for this
+   *  attack (excluded by the model or by the 3-hero limit). */
+  const heroNotSelected = (slug: string): boolean => {
+    const d = heroes.find((h) => h.id === slug);
+    return d != null && !d.use;
+  };
+  // A used hero with neither a deployment step nor an ability entry
+  // cannot be rendered — flag it (the plan stays valid; the prompt
+  // demands deployment).
+  for (const d of heroes) {
+    if (d.use && !deployedHeroes.has(d.id) && !abilityHeroes.has(d.id)) {
+      warnings.push(`Hero "${d.id}" is marked used but has no deployment step or ability.`);
+    }
+  }
+
   // ---- deployment plan ----
   const phaseNames = new Set(
     asArray(rawObj.attack_phases).map((p) => String(p?.name ?? "")).filter(Boolean),
@@ -255,6 +364,10 @@ export function validateStrategy(
     }
     if (!thAvailable(slug, constraints.townHall)) {
       warnings.push(`Deployment step for "${slug}" is not available at TH${constraints.townHall}; dropped.`);
+      continue;
+    }
+    if (resolveEntity(slug)?.kind === "hero" && heroNotSelected(slug)) {
+      warnings.push(`Deployment step for "${slug}" dropped: hero not selected for this attack.`);
       continue;
     }
     const count = intCount(d?.count ?? 1);
@@ -338,7 +451,15 @@ export function validateStrategy(
       style: p?.style === "funnel" || p?.style === "cleanup" ? p.style : ("attack" as const),
       step: stepRef(p?.step),
     }))
-    .filter((p) => p.unit && p.points.length >= 2);
+    .filter((p) => {
+      if (!p.unit || p.points.length < 2) return false;
+      const slug = resolveSlug(p.unit);
+      if (slug && resolveEntity(slug)?.kind === "hero" && heroNotSelected(slug)) {
+        warnings.push(`Path for "${p.unit}" dropped: hero not selected for this attack.`);
+        return false;
+      }
+      return true;
+    });
   for (const p of asArray(rawObj.paths)) {
     if (!String(p?.unit ?? "") || asArray(p?.points).length < 2) {
       warnings.push(`Path for "${String(p?.unit)}" needs at least 2 points; dropped.`);
@@ -379,8 +500,15 @@ export function validateStrategy(
         warnings.push(`Hero ability for "${h.hero}" not available at TH${constraints.townHall}; dropped.`);
         return false;
       }
+      if (resolveEntity(h.hero)?.kind === "hero" && heroNotSelected(h.hero)) {
+        warnings.push(`Hero ability for "${h.hero}" dropped: hero not selected for this attack.`);
+        return false;
+      }
       return true;
     });
+
+  // ---- hero decisions (see above: parsed before the deployment
+  // plan so the final decisions gate steps, paths and abilities) ----
 
   // ---- phases ----
   let phaseNo = 0;
@@ -438,6 +566,7 @@ export function validateStrategy(
     army: { troops, spells, ...(siege ? { siege_machine: siege } : {}), ...(ccTroops.length ? { clan_castle: ccTroops } : {}) },
     base_analysis,
     deployment_plan,
+    heroes: heroes.length ? heroes : undefined,
     paths: paths.length ? paths : undefined,
     spell_actions: spell_actions.length ? spell_actions : undefined,
     hero_abilities: hero_abilities.length ? hero_abilities : undefined,

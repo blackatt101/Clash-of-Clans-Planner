@@ -54,6 +54,14 @@ export const fixture = {
     { step: 6, phase: "core", unit: "healer", count: 8, position: { x: 0.6, y: 0.92 }, target: "core", purpose: "Sustain the air main into the core." },
     { step: 7, phase: "cleanup", unit: "royal-champion", count: 1, position: { x: 0.4, y: 0.3 }, target: "north-east leftovers", purpose: "Clean up the north-east and hunt enemy heroes." },
   ],
+  heroes: [
+    { id: "archer-queen", use: true, role: "queen-charge", reason: "Charges the western compartment and takes the CC pull before the air main enters." },
+    { id: "royal-champion", use: true, role: "cleanup", reason: "Hunts the north-east leftovers and enemy heroes once the core collapses." },
+    { id: "barbarian-king", use: false, role: null, reason: "The miner funnel already seals the west compartment; the king would only duplicate the queen's funnel value." },
+    { id: "grand-warden", use: false, role: null, reason: "The air main is sustained by 8 healers through the core; the warden's aura would protect troops that are already covered." },
+    { id: "minion-prince", use: false, role: null, reason: "No single air compartment to storm — the air defenses are spread, so the prince's charge adds little over the balloon screen." },
+    { id: "dragon-duke", use: false, role: null, reason: "The air main already counts on the warden's support and the balloon screen; a second air hero adds little without a second air compartment to storm." },
+  ],
   paths: [
     { step: 1, unit: "archer-queen", points: [{ x: 0.18, y: 0.8 }, { x: 0.2, y: 0.62 }, { x: 0.3, y: 0.55 }], style: "attack" },
     { step: 3, unit: "miner", points: [{ x: 0.28, y: 0.75 }, { x: 0.35, y: 0.65 }], style: "funnel" },
