@@ -43,3 +43,6 @@ next-env.d.ts
 __pycache__/
 .fandom-cache/
 .aider*
+
+# claude code session state (worktrees, settings)
+.claude/
