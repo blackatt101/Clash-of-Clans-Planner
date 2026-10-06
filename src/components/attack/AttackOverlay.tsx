@@ -44,6 +44,8 @@ import type { AttackStrategy, Point } from "@/lib/attack/types";
 import { resolveEntity } from "@/lib/attack/catalog";
 import {
   arrowHead,
+  arrowHeadAt,
+  intermediateArrowIndices,
   labelAnchor,
   pathD,
   placeLabels,
@@ -106,6 +108,8 @@ export interface OverlayToggles {
   paths: boolean;
   spells: boolean;
   targets: boolean;
+  abilities?: boolean;
+  debug?: boolean;
 }
 
 export interface OverlayDrag {
@@ -149,6 +153,7 @@ export default function AttackOverlay(props: OverlayProps) {
   const funnels = strategy.base_analysis?.funnels ?? [];
   const entries = strategy.base_analysis?.entryPoints ?? [];
   const phases = strategy.attack_phases ?? [];
+  const heroAbilities = useMemo(() => strategy.hero_abilities ?? [], [strategy.hero_abilities]);
 
   /** Marker icon per slug, resolved once per render. */
   const iconFor = useMemo(() => {
@@ -170,11 +175,15 @@ export default function AttackOverlay(props: OverlayProps) {
 
   const isActive = (phase: string) => (activePhase !== null ? phase === activePhase : true);
 
-  // ---- step attribution: which deployment step owns each path/spell ----
+  // ---- step attribution: which deployment step owns each path/spell/ability ----
   const pathStep = useMemo(() => paths.map((p) => pathStepIndex(p, steps)), [paths, steps]);
   const spellStep = useMemo(
     () => spells.map((s) => spellStepIndex(s, steps, paths)),
     [spells, steps, paths],
+  );
+  const abilityStep = useMemo(
+    () => heroAbilities.map((a) => (a.step != null ? a.step - 1 : null)),
+    [heroAbilities],
   );
 
   /** Colour of the attack group (phase) that owns deployment step `i`. */
@@ -469,6 +478,8 @@ export default function AttackOverlay(props: OverlayProps) {
         const pts = sm.points;
         const d = pathD(pts, vb);
         const head = arrowHead(pts, vb, vb.w * weight.arrow);
+        // PROMPT D §19: Multiple arrowheads on long paths for clear direction
+        const intermediateArrows = intermediateArrowIndices(pts);
         return (
           <g key={`p-${pi}`} id={`ovl-path-${pi}`} opacity={op}>
             {weight.glow > 0 && (
@@ -482,6 +493,20 @@ export default function AttackOverlay(props: OverlayProps) {
               strokeLinecap="round"
             />
             <polygon points={head} fill={color} stroke="#080c12" strokeWidth={vb.w * 0.0018} />
+            {/* Intermediate arrowheads for long paths */}
+            {intermediateArrows.map((idx) => {
+              const midHead = arrowHeadAt(pts, vb, idx, vb.w * weight.arrow * 0.75);
+              return (
+                <polygon
+                  key={`arrow-${idx}`}
+                  points={midHead}
+                  fill={color}
+                  stroke="#080c12"
+                  strokeWidth={vb.w * 0.0015}
+                  opacity={0.85}
+                />
+              );
+            })}
             {pts.map((pt, j) => {
               const { x, y } = toVb(pt, vb);
               const edge = j === 0 || j === pts.length - 1;
@@ -544,13 +569,116 @@ export default function AttackOverlay(props: OverlayProps) {
         );
       })}
 
+      {/* Layer 4.5 — Hero abilities: event markers shown along the path
+          (PROMPT D §13). Each ability appears as a diamond marker with a
+          compact label, revealing when its step is active. */}
+      {(toggles.abilities ?? true) && heroAbilities.map((ability, idx) => {
+        const si = abilityStep[idx];
+        if (si != null && !isRendered(stepVis(si, activeStep))) return null;
+        const op = si != null ? stepOp(si) : 1;
+
+        // If no position, skip rendering
+        if (!ability.position) return null;
+
+        const { x, y } = toVb(ability.position, vb);
+        const color = si != null ? groupColor(si) : "#f2b53a";
+        const diamondSize = vb.w * 0.018;
+
+        // Extract ability name from hero slug (e.g. "archer-queen" → "ROYAL CLOAK")
+        const abilityNames: Record<string, string> = {
+          "archer-queen": "ROYAL CLOAK",
+          "barbarian-king": "IRON FIST",
+          "grand-warden": "ETERNAL TOME",
+          "royal-champion": "SEEKING SHIELD",
+        };
+        const abilityLabel = abilityNames[ability.hero] ?? "ABILITY";
+
+        return (
+          <g key={`ability-${idx}`} id={`ovl-ability-${idx}`} opacity={op}>
+            {/* Diamond marker */}
+            <path
+              d={`M ${x} ${y - diamondSize} L ${x + diamondSize} ${y} L ${x} ${y + diamondSize} L ${x - diamondSize} ${y} Z`}
+              fill={color}
+              stroke="#080c12"
+              strokeWidth={vb.w * 0.0024}
+              opacity={0.9}
+            />
+            {/* Ability label below the diamond */}
+            <text
+              x={x}
+              y={y + vb.w * 0.038}
+              textAnchor="middle"
+              fontSize={vb.w * 0.013}
+              fontWeight={700}
+              fill={color}
+              stroke="#080c12"
+              strokeWidth={vb.w * 0.0022}
+              style={{ paintOrder: "stroke" }}
+            >
+              [{abilityLabel}]
+            </text>
+            {/* Trigger condition (if provided and not too long) */}
+            {ability.trigger && ability.trigger.length < 30 && (
+              <text
+                x={x}
+                y={y + vb.w * 0.052}
+                textAnchor="middle"
+                fontSize={vb.w * 0.01}
+                fill="#eef1f7"
+                opacity={0.75}
+                stroke="#080c12"
+                strokeWidth={vb.w * 0.0018}
+                style={{ paintOrder: "stroke" }}
+              >
+                {ability.trigger}
+              </text>
+            )}
+          </g>
+        );
+      })}
+
       {/* Layer 5 — deployment markers, one per troop GROUP, revealed
           with their step; sub-deployments ride along with their parent */}
       {toggles.markers && steps.map((s, i) => {
         if (!isRendered(stepVis(i, activeStep))) return null;
         const op = stepOp(i);
+        const color = groupColor(i);
+
+        // PROMPT D §8: Line deployment visualization for mass troops
+        const showDeploymentLine = s.deploymentType === "line" && s.deploymentEnd;
+
         return (
           <g key={`step-${i}`} id={`ovl-step-${i}`}>
+            {showDeploymentLine && (
+              <g opacity={op * 0.9}>
+                {/* Deployment line */}
+                <line
+                  x1={s.position.x * vb.w}
+                  y1={s.position.y * vb.h}
+                  x2={s.deploymentEnd!.x * vb.w}
+                  y2={s.deploymentEnd!.y * vb.h}
+                  stroke={color}
+                  strokeWidth={vb.w * 0.006}
+                  strokeDasharray={`${vb.w * 0.008} ${vb.w * 0.004}`}
+                  strokeOpacity={0.7}
+                />
+                {/* End markers */}
+                <circle
+                  cx={s.position.x * vb.w}
+                  cy={s.position.y * vb.h}
+                  r={vb.w * 0.008}
+                  fill={color}
+                  opacity={0.8}
+                />
+                <circle
+                  cx={s.deploymentEnd!.x * vb.w}
+                  cy={s.deploymentEnd!.y * vb.h}
+                  r={vb.w * 0.008}
+                  fill={color}
+                  opacity={0.8}
+                />
+              </g>
+            )}
             {marker(`m-${i}`, s.position, s.unit, s.step, i, false, op)}
             {s.deployments?.map((d, j) =>
               marker(`ms-${i}-${j}`, d.position, s.unit, s.step, i, true, op),
@@ -593,6 +721,155 @@ export default function AttackOverlay(props: OverlayProps) {
           </g>
         );
       })}
+
+      {/* Layer 7 — DEBUG MODE (PROMPT D §29)
+          Shows normalized coordinates, waypoint numbers, group IDs, target IDs,
+          and path directions for development and troubleshooting. */}
+      {toggles.debug && (
+        <g opacity={0.85}>
+          {/* Debug: Deployment step coordinates */}
+          {steps.map((s, i) => {
+            const { x, y } = toVb(s.position, vb);
+            return (
+              <g key={`dbg-step-${i}`}>
+                <text
+                  x={x} y={y - vb.w * 0.055}
+                  textAnchor="middle" fontSize={vb.w * 0.014}
+                  fill="#4fc3f7" fontWeight={600}
+                  stroke="#000" strokeWidth={vb.w * 0.002}
+                  style={{ paintOrder: "stroke" }}
+                >
+                  Step {s.step}: ({s.position.x.toFixed(3)}, {s.position.y.toFixed(3)})
+                </text>
+                <text
+                  x={x} y={y - vb.w * 0.038}
+                  textAnchor="middle" fontSize={vb.w * 0.012}
+                  fill="#8ed16a"
+                  stroke="#000" strokeWidth={vb.w * 0.0015}
+                  style={{ paintOrder: "stroke" }}
+                >
+                  {s.unit} | Phase: {s.phase}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Debug: Path waypoints with numbers and direction */}
+          {paths.map((p, pi) => {
+            const si = pathStep[pi];
+            if (!isRendered(elemVis(si))) return null;
+            return (
+              <g key={`dbg-path-${pi}`}>
+                {p.points.map((pt, j) => {
+                  const { x, y } = toVb(pt, vb);
+                  const isStart = j === 0;
+                  const isEnd = j === p.points.length - 1;
+                  return (
+                    <g key={j}>
+                      <text
+                        x={x} y={y - vb.w * 0.018}
+                        textAnchor="middle" fontSize={vb.w * 0.013}
+                        fill={isStart ? "#199e70" : isEnd ? "#e0533f" : "#f2b53a"}
+                        fontWeight={700}
+                        stroke="#000" strokeWidth={vb.w * 0.002}
+                        style={{ paintOrder: "stroke" }}
+                      >
+                        {isStart ? "START" : isEnd ? "END" : `#${j}`}
+                      </text>
+                      <text
+                        x={x} y={y + vb.w * 0.025}
+                        textAnchor="middle" fontSize={vb.w * 0.01}
+                        fill="#fff" opacity={0.9}
+                        stroke="#000" strokeWidth={vb.w * 0.0015}
+                        style={{ paintOrder: "stroke" }}
+                      >
+                        ({pt.x.toFixed(2)}, {pt.y.toFixed(2)})
+                      </text>
+                    </g>
+                  );
+                })}
+                {/* Path direction indicator */}
+                <text
+                  x={toVb(p.points[0], vb).x + vb.w * 0.03}
+                  y={toVb(p.points[0], vb).y}
+                  fontSize={vb.w * 0.012}
+                  fill="#199e70" fontWeight={700}
+                  stroke="#000" strokeWidth={vb.w * 0.002}
+                  style={{ paintOrder: "stroke" }}
+                >
+                  → {p.unit}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Debug: Spell positions */}
+          {spells.map((sp, idx) => {
+            const si = spellStep[idx];
+            if (!isRendered(elemVis(si))) return null;
+            const { x, y } = toVb(sp.position, vb);
+            return (
+              <text
+                key={`dbg-spell-${idx}`}
+                x={x} y={y + vb.w * 0.045}
+                textAnchor="middle" fontSize={vb.w * 0.011}
+                fill="#a05cd5" fontWeight={600}
+                stroke="#000" strokeWidth={vb.w * 0.0015}
+                style={{ paintOrder: "stroke" }}
+              >
+                {sp.spell} ({sp.position.x.toFixed(2)}, {sp.position.y.toFixed(2)})
+              </text>
+            );
+          })}
+
+          {/* Debug: Target IDs */}
+          {targets.map((t, i) => {
+            const { x, y } = toVb(t.position, vb);
+            return (
+              <text
+                key={`dbg-target-${i}`}
+                x={x} y={y - vb.w * 0.035}
+                textAnchor="middle" fontSize={vb.w * 0.01}
+                fill="#ffd35c" fontWeight={600}
+                stroke="#000" strokeWidth={vb.w * 0.0015}
+                style={{ paintOrder: "stroke" }}
+              >
+                Target: {t.type}
+              </text>
+            );
+          })}
+
+          {/* Debug: Hero Abilities */}
+          {heroAbilities.map((ability, idx) => {
+            if (!ability.position) return null;
+            const si = abilityStep[idx];
+            if (si != null && !isRendered(stepVis(si, activeStep))) return null;
+            const { x, y } = toVb(ability.position, vb);
+            return (
+              <g key={`dbg-ability-${idx}`}>
+                <text
+                  x={x} y={y - vb.w * 0.025}
+                  textAnchor="middle" fontSize={vb.w * 0.011}
+                  fill="#a05cd5" fontWeight={600}
+                  stroke="#000" strokeWidth={vb.w * 0.0015}
+                  style={{ paintOrder: "stroke" }}
+                >
+                  {ability.hero}: {ability.trigger}
+                </text>
+                <text
+                  x={x} y={y + vb.w * 0.055}
+                  textAnchor="middle" fontSize={vb.w * 0.01}
+                  fill="#fff" opacity={0.9}
+                  stroke="#000" strokeWidth={vb.w * 0.0015}
+                  style={{ paintOrder: "stroke" }}
+                >
+                  ({ability.position.x.toFixed(2)}, {ability.position.y.toFixed(2)})
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      )}
     </svg>
   );
 }

@@ -23,6 +23,7 @@ import type { AttackStrategy, Point } from "@/lib/attack/types";
 import AttackOverlay, { type OverlayToggles } from "./AttackOverlay";
 import { AttackStepsPanel } from "./AttackStepsPanel";
 import { AttackArmyPanel } from "./AttackArmyPanel";
+import { AttackTimeline } from "./AttackTimeline";
 import { exportAttackPlan } from "@/lib/attack/export";
 import { AttackLegend } from "./AttackLegend";
 
@@ -55,6 +56,8 @@ export default function AttackPlanViewer({
     paths: true,
     spells: true,
     targets: true,
+    abilities: true,
+    debug: false,
   });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -300,6 +303,7 @@ export default function AttackPlanViewer({
               ["markers", "Markers"],
               ["paths", "Paths"],
               ["spells", "Spells"],
+              ["abilities", "Abilities"],
               ["targets", "Targets"],
             ] as const
           ).map(([key, label]) => (
@@ -313,6 +317,15 @@ export default function AttackPlanViewer({
               {label}
             </button>
           ))}
+          <button
+            className={btn}
+            aria-pressed={toggles.debug}
+            onClick={() => setToggles((t) => ({ ...t, debug: !t.debug }))}
+            title="Developer debug mode (PROMPT D §29)"
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${toggles.debug ? "bg-[#4fc3f7]" : "bg-ink-faint/40"}`} />
+            Debug
+          </button>
           <span className="mx-1 h-5 w-px bg-line" />
           <button className={btn} onClick={() => zoomBy(1.25)} aria-label="Zoom in">＋</button>
           <button className={btn} onClick={() => zoomBy(1 / 1.25)} aria-label="Zoom out">－</button>
@@ -387,7 +400,17 @@ export default function AttackPlanViewer({
           }}
           images={images}
         />
-        <AttackArmyPanel strategy={strategy} images={images} />
+        <div className="flex flex-col gap-3">
+          <AttackTimeline
+            strategy={strategy}
+            activeStep={focusedStep}
+            onStepSelect={(i) => {
+              setActiveStep(i);
+              setActivePhase(null);
+            }}
+          />
+          <AttackArmyPanel strategy={strategy} images={images} />
+        </div>
       </div>
 
       {/* Phase description, when a phase filter is active */}

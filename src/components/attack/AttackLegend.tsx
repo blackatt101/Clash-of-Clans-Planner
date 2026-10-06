@@ -53,6 +53,10 @@ export function AttackLegend() {
           <span className="text-ink-faint">○</span>
           Drag to edit
         </div>
+        <div className={row}>
+          <span className="text-[#f2b53a]">◆</span>
+          Hero ability
+        </div>
       </div>
       {/* Attack groups paint themselves in phase colours. */}
       <div className="mt-1.5 flex items-center gap-1 border-t border-line pt-1.5">

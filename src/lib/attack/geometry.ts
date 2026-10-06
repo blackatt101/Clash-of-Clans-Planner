@@ -67,6 +67,61 @@ export function arrowHead(points: Point[], vb: ViewBox, size: number): string {
   return `${tip.x.toFixed(1)},${tip.y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)} ${tail.x.toFixed(1)},${tail.y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
 }
 
+/**
+ * Generate arrowhead at a specific point index along a path.
+ * Used for intermediate directional indicators on long paths.
+ */
+export function arrowHeadAt(
+  points: Point[],
+  vb: ViewBox,
+  index: number,
+  size: number,
+): string {
+  if (points.length < 2 || index < 1 || index >= points.length) return "";
+  const tip = toVb(points[index], vb);
+  const prev = toVb(points[index - 1], vb);
+  const ang = Math.atan2(tip.y - prev.y, tip.x - prev.x);
+  const r = size;
+  const back = ang + Math.PI;
+  const spread = 0.5;
+  const p1 = {
+    x: tip.x + Math.cos(back + spread) * r,
+    y: tip.y + Math.sin(back + spread) * r,
+  };
+  const p2 = {
+    x: tip.x + Math.cos(back - spread) * r,
+    y: tip.y + Math.sin(back - spread) * r,
+  };
+  const tail = {
+    x: tip.x + Math.cos(back) * r * 0.4,
+    y: tip.y + Math.sin(back) * r * 0.4,
+  };
+  return `${tip.x.toFixed(1)},${tip.y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)} ${tail.x.toFixed(1)},${tail.y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+}
+
+/**
+ * Calculate positions for intermediate arrowheads on long paths.
+ * Returns indices where directional arrowheads should appear.
+ *
+ * For paths with 5+ points, places arrowheads at roughly equal intervals
+ * to make movement direction crystal clear, as per PROMPT D requirement 19.
+ */
+export function intermediateArrowIndices(points: Point[]): number[] {
+  if (points.length < 5) return [];
+
+  // For long paths, place arrowheads at ~33% and ~66% along the path
+  const indices: number[] = [];
+  const third = Math.floor(points.length / 3);
+  const twoThirds = Math.floor((points.length * 2) / 3);
+
+  if (third > 0 && third < points.length - 1) indices.push(third);
+  if (twoThirds > third + 1 && twoThirds < points.length - 1) {
+    indices.push(twoThirds);
+  }
+
+  return indices;
+}
+
 /** Where to anchor a marker label so it doesn't run off the base. */
 export function labelAnchor(p: Point): "start" | "middle" | "end" {
   if (p.x < 0.2) return "start";

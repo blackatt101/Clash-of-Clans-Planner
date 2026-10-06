@@ -1,10 +1,10 @@
-npm notice run coc-planner@0.1.0 start
-npm notice run next start -p ${PORT:-3000}
-[1m[38;2;173;127;168m▲ Next.js 16.3.5[39m[22m
+npm notice run coc-planner@0.1.0 start:direct
+npm notice run next start -p 3000
+▲ Next.js 16.3.5
 - Local:         http://localhost:3000
 - Network:       http://172.31.45.153:3000
-[32m[1m✓[22m[39m Ready in 100ms
-[33m[1m⚠[22m[39m Warning: Next.js ignored package-lock.json in /root because it is outside the current Git repository (/root/coc-planner).
+✓ Ready in 109ms
+⚠ Warning: Next.js ignored package-lock.json in /home/ubuntu because it is outside the current Git repository (/home/ubuntu/coc-planner).
  To use this directory, set `outputFileTracingRoot` in your Next.js config.
 
-[32m[1m✓[22m[39m Running next.config.ts took 23ms
+✓ Running next.config.ts took 36ms

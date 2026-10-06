@@ -671,10 +671,44 @@ export function validateStrategy(
     );
   }
 
-  const deployment_plan: DeploymentStep[] = merged.map((s, i) => ({
-    step: i + 1,
-    ...s,
-  }));
+  const deployment_plan: DeploymentStep[] = merged.map((s, i) => {
+    const base: DeploymentStep = {
+      step: i + 1,
+      phase: s.phase,
+      unit: s.unit,
+      count: s.count,
+      position: s.position,
+      ...(s.target ? { target: s.target } : {}),
+      ...(s.purpose ? { purpose: s.purpose } : {}),
+      ...(s.deployments ? { deployments: s.deployments } : {}),
+    };
+    // Enhanced fields from raw input
+    const raw = asArray(rawObj.deployment_plan)[i];
+    if (raw) {
+      if (raw.deploymentType === "line" || raw.deploymentType === "area" || raw.deploymentType === "point") {
+        base.deploymentType = raw.deploymentType;
+      }
+      if (raw.deploymentEnd) {
+        base.deploymentEnd = clampPoint(raw.deploymentEnd);
+      }
+      if (asArray(raw.primaryTargets).length) {
+        base.primaryTargets = asArray(raw.primaryTargets)
+          .map((id) => String(id ?? "").trim())
+          .filter(Boolean)
+          .slice(0, 8);
+      }
+      if (asArray(raw.secondaryTargets).length) {
+        base.secondaryTargets = asArray(raw.secondaryTargets)
+          .map((id) => String(id ?? "").trim())
+          .filter(Boolean)
+          .slice(0, 6);
+      }
+      if (raw.finalObjective) {
+        base.finalObjective = String(raw.finalObjective).trim().slice(0, 60);
+      }
+    }
+    return base;
+  });
   if (deployment_plan.length === 0) {
     errors.push("Deployment plan is empty — at least one deployment is required.");
   }
@@ -706,6 +740,12 @@ export function validateStrategy(
       points: (asArray(p?.points) as Raw[]).map((pt) => clampPoint(pt)),
       style: p?.style === "funnel" || p?.style === "cleanup" ? p.style : ("attack" as const),
       step: stepRef(p?.step),
+      targetIds: asArray(p?.targetIds)
+        .map((id) => String(id ?? "").trim())
+        .filter(Boolean)
+        .slice(0, 8),
+      confidence: isNum(p?.confidence) ? Math.min(1, Math.max(0, p.confidence)) : undefined,
+      reason: p?.reason ? String(p.reason).trim().slice(0, 240) : undefined,
     }))
     .filter((p) => {
       if (!p.unit || p.points.length < 2) return false;
@@ -721,6 +761,20 @@ export function validateStrategy(
       warnings.push(`Path for "${String(p?.unit)}" needs at least 2 points; dropped.`);
     }
   }
+  // Check for major troop groups without paths (heroes, siege, main army)
+  const pathUnits = new Set(paths.map((p) => p.unit.toLowerCase()));
+  for (const step of deployment_plan) {
+    const slug = step.unit;
+    const entity = resolveEntity(slug);
+    const isHero = entity?.kind === "hero";
+    const isSiege = entity?.kind === "siege";
+    const isMajorTroop = step.count >= 8; // Main army groups typically 8+
+    if ((isHero || isSiege || isMajorTroop) && !pathUnits.has(slug.toLowerCase())) {
+      warnings.push(
+        `Major deployment "${slug}" (step ${step.step}) has no movement path — the renderer cannot show where this group moves.`,
+      );
+    }
+  }
 
   // ---- spell actions ----
   const spell_actions = asArray(rawObj.spell_actions)
@@ -730,6 +784,11 @@ export function validateStrategy(
       trigger: s?.trigger ? String(s.trigger).slice(0, 240) : undefined,
       purpose: s?.purpose ? String(s.purpose).slice(0, 240) : undefined,
       step: stepRef(s?.step),
+      targetGroup: s?.targetGroup ? String(s.targetGroup).trim().slice(0, 60) : undefined,
+      nearbyDefenses: asArray(s?.nearbyDefenses)
+        .map((id) => String(id ?? "").trim())
+        .filter(Boolean)
+        .slice(0, 8),
     }))
     .filter((s) => {
       if (resolveSlug(s.spell) === null) return false;
@@ -749,6 +808,9 @@ export function validateStrategy(
       hero: resolveSlug(h?.hero) ?? String(h?.hero ?? ""),
       trigger: String(h?.trigger ?? "").slice(0, 240),
       purpose: h?.purpose ? String(h.purpose).slice(0, 240) : undefined,
+      position: h?.position ? clampPoint(h.position) : undefined,
+      step: stepRef(h?.step),
+      supportsGroup: h?.supportsGroup ? String(h.supportsGroup).trim().slice(0, 60) : undefined,
     }))
     .filter((h) => {
       if (resolveSlug(h.hero) === null) return false;
@@ -786,13 +848,29 @@ export function validateStrategy(
   const base_analysis = {
     townHallLevel: isNum(ba.townHallLevel) ? Math.round(ba.townHallLevel) : undefined,
     townHallPosition: ba.townHallPosition ? clampPoint(ba.townHallPosition) : undefined,
+    townHallConfidence: isNum(ba.townHallConfidence)
+      ? Math.min(1, Math.max(0, ba.townHallConfidence))
+      : undefined,
     townHallWeapon: ba.townHallWeapon ? String(ba.townHallWeapon).slice(0, 40) : undefined,
     clanCastlePosition: ba.clanCastlePosition ? clampPoint(ba.clanCastlePosition) : undefined,
+    clanCastleConfidence: isNum(ba.clanCastleConfidence)
+      ? Math.min(1, Math.max(0, ba.clanCastleConfidence))
+      : undefined,
     baseShape: ba.baseShape ? String(ba.baseShape).slice(0, 60) : undefined,
     structuralTraits: asArray(ba.structuralTraits)
       .map((s) => String(s ?? "").trim().slice(0, 60))
       .filter(Boolean)
       .slice(0, 8),
+    defenseInventory: (asArray(ba.defenseInventory) as Raw[])
+      .map((d) => ({
+        id: String(d?.id ?? "").trim().slice(0, 40),
+        type: String(d?.type ?? "unknown_defense").trim().slice(0, 40),
+        position: clampPoint(d?.position),
+        confidence: isNum(d?.confidence) ? Math.min(1, Math.max(0, d.confidence)) : 0.5,
+        notes: d?.notes ? String(d.notes).trim().slice(0, 120) : undefined,
+      }))
+      .filter((d) => d.id && d.type)
+      .slice(0, 50),
     keyDefenses: (asArray(ba.keyDefenses) as Raw[])
       .map((k) => ({
         type: String(k?.type ?? "unknown_defense"),
@@ -803,6 +881,14 @@ export function validateStrategy(
       }))
       .filter((k) => k.type)
       .slice(0, 12),
+    enemyHeroes: (asArray(ba.enemyHeroes) as Raw[])
+      .map((h) => ({
+        type: String(h?.type ?? "").trim().slice(0, 40),
+        position: clampPoint(h?.position),
+        confidence: isNum(h?.confidence) ? Math.min(1, Math.max(0, h.confidence)) : 0.5,
+      }))
+      .filter((h) => h.type)
+      .slice(0, 6),
     pathingNotes: ba.pathingNotes
       ? String(ba.pathingNotes).trim().slice(0, 800)
       : undefined,

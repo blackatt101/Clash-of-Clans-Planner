@@ -52,6 +52,29 @@ export interface DeploymentStep {
    * spreads are drawn as separate sub-markers on the same step.
    */
   deployments?: { count: number; position: Point; label?: string }[];
+  /**
+   * Deployment type for rendering. "point" = single position (heroes, siege),
+   * "line" = spread along a line (hybrid, main army), "area" = distributed.
+   */
+  deploymentType?: "point" | "line" | "area";
+  /**
+   * For line deployments: end point of the deployment line.
+   * The main `position` is the start.
+   */
+  deploymentEnd?: Point;
+  /**
+   * Primary building IDs this group targets (from defenseInventory).
+   * Allows renderer to draw connections from path to actual buildings.
+   */
+  primaryTargets?: string[];
+  /**
+   * Secondary targets (fallback objectives).
+   */
+  secondaryTargets?: string[];
+  /**
+   * Final objective for this group (e.g. "town_hall").
+   */
+  finalObjective?: string;
 }
 
 export interface TroopPath {
@@ -67,6 +90,20 @@ export interface TroopPath {
    * unit matching; unmatched paths show in "All steps" only).
    */
   step?: number;
+  /**
+   * Building IDs this path is intended to reach/destroy (from defenseInventory).
+   * Links the movement to actual recognized buildings.
+   */
+  targetIds?: string[];
+  /**
+   * Path confidence (0-1). Lower confidence when base structure makes
+   * troop movement unpredictable.
+   */
+  confidence?: number;
+  /**
+   * Tactical reason for this specific path route.
+   */
+  reason?: string;
 }
 
 export interface SpellAction {
@@ -81,12 +118,33 @@ export interface SpellAction {
    * compatibility (older plans show spells in "All steps" only).
    */
   step?: number;
+  /**
+   * Which troop group this spell supports (unit slug from deployment_plan).
+   * Allows renderer to visually link spell to its beneficiary.
+   */
+  targetGroup?: string;
+  /**
+   * Building IDs near this spell location (for tactical context).
+   */
+  nearbyDefenses?: string[];
 }
 
 export interface HeroAbility {
   hero: string;
   trigger: string;
   purpose?: string;
+  /**
+   * Position where the ability should be activated (normalized coords).
+   */
+  position?: Point;
+  /**
+   * 1-based step when this ability fires.
+   */
+  step?: number;
+  /**
+   * Which troop group this ability supports.
+   */
+  supportsGroup?: string;
 }
 
 /**
@@ -160,11 +218,32 @@ export interface KeyDefense {
   threat?: "high" | "medium" | "low";
 }
 
+/**
+ * A single identified defense from the base recognition phase.
+ * Every defense must have a position and confidence score.
+ */
+export interface IdentifiedDefense {
+  /** Unique ID for this defense instance (e.g. "inferno_1", "xbow_2"). */
+  id: string;
+  /** Defense type (eagle_artillery, inferno_tower, x_bow, air_defense, etc). */
+  type: string;
+  /** Normalized position where this defense was identified. */
+  position: Point;
+  /** Identification confidence (0-1). */
+  confidence: number;
+  /** Optional notes about this specific defense. */
+  notes?: string;
+}
+
 export interface BaseAnalysis {
   townHallLevel?: number;
   townHallPosition?: Point;
+  /** Confidence in Town Hall identification (0-1). */
+  townHallConfidence?: number;
   townHallWeapon?: string;
   clanCastlePosition?: Point;
+  /** Confidence in Clan Castle identification (0-1). */
+  clanCastleConfidence?: number;
   baseShape?: string;
   /**
    * Structural traits the screenshot actually evidences (ring base,
@@ -172,8 +251,21 @@ export interface BaseAnalysis {
    * with visible evidence should be claimed.
    */
   structuralTraits?: string[];
+  /**
+   * Complete inventory of identified defenses from the systematic scan.
+   * Each defense has a position and confidence score.
+   */
+  defenseInventory?: IdentifiedDefense[];
   /** The defenses that determine the strategy, with threat level. */
   keyDefenses?: KeyDefense[];
+  /**
+   * Identified enemy heroes (not attacker heroes). Each has position and confidence.
+   */
+  enemyHeroes?: Array<{
+    type: string;
+    position: Point;
+    confidence: number;
+  }>;
   /** The deployment → funnel → entry → … → cleanup pathing reasoning. */
   pathingNotes?: string;
   layoutNotes?: string;
