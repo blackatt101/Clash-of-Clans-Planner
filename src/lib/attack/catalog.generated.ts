@@ -582,7 +582,6 @@ export const SLUG_ALIASES: Record<string, string> = {
   "battle_blimp": "battle-blimp"
 };
 
-/** Troop slugs that cannot be placed in the Clan Castle. */
 /** Troop slugs that CAN be placed in the enemy Clan Castle (Supercell rule: allow list). */
 export const CC_ELIGIBLE = new Set<string>([
   "barbarian",

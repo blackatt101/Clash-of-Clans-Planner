@@ -405,6 +405,7 @@ export default function AttackOverlay(props: OverlayProps) {
       className="absolute inset-0 h-full w-full touch-none select-none"
       viewBox={`0 0 ${vb.w} ${vb.h}`}
       preserveAspectRatio="xMidYMid meet"
+      aria-hidden="true"
     >
       {/* Layer 2 — target highlights: compact glyphs, always visible
           (they answer "what matters here"); the base stays readable */}
