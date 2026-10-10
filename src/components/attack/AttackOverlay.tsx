@@ -584,12 +584,15 @@ export default function AttackOverlay(props: OverlayProps) {
         const color = si != null ? groupColor(si) : "#f2b53a";
         const diamondSize = vb.w * 0.018;
 
-        // Extract ability name from hero slug (e.g. "archer-queen" → "ROYAL CLOAK")
+        // Extract ability name from hero slug (e.g. "archer-queen" → "ROYAL CLOAK").
+        // Falls back to "ABILITY" for unknown heroes — the label is cosmetic only.
         const abilityNames: Record<string, string> = {
           "archer-queen": "ROYAL CLOAK",
           "barbarian-king": "IRON FIST",
           "grand-warden": "ETERNAL TOME",
           "royal-champion": "SEEKING SHIELD",
+          "minion-prince": "DARK ORB",
+          "dragon-duke": "FLAME BLOWER",
         };
         const abilityLabel = abilityNames[ability.hero] ?? "ABILITY";
 

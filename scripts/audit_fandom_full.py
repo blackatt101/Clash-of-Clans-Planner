@@ -75,24 +75,50 @@ def tables(text: str) -> list[list[list[str]]]:
     return output
 
 
-def extract(text: str) -> list[dict[str, int | None]]:
-    """Extract only rows using Fandom's explicit cost/time cell classes."""
+def _level_cell(block: str) -> int | None:
+    """The block's leading level cell. Tolerates `|3`, `|3|` and `|3||class=...`."""
+    m = re.match(r"\s*\|{1,2}\s*(\d+)\s*(?:\||\n|$)", block)
+    return int(m.group(1)) if m else None
+
+
+def _cost_time_cells(block: str) -> tuple[int | None, int | None]:
+    """Return (cost, time) seconds for a level row.
+
+    The time is anchored to the *first* time cell that follows the cost cell,
+    so rows containing several time-bearing cells (e.g. a troop's lifetime
+    column plus its build time) read the build time, not the lifetime.
+    """
+    cost_m = re.search(r"(?:bCost|rCost)[^|\n]*\|\s*([^\n|]+)", block)
+    if not cost_m:
+        return None, None
+    time_m = re.search(r"(?:bTime|rTime)[^|\n]*\|\s*([^\n|]+)", block[cost_m.end():])
+    cost = number(cost_m.group(1))
+    time = seconds(time_m.group(1)) if time_m else None
+    return cost, time
+
+
+def extract(text: str) -> list[list[dict[str, int | None]]]:
+    """Extract the cost/time rows of *every* cost/time table on the page.
+
+    A page can carry several such tables (a main level table plus gear-up,
+    supercharge/charge, boost, or per-module/per-resource variant tables).
+    Returning them separately lets the caller match a planner entity against
+    whichever table is the authoritative one instead of blending them.
+    """
+    tables_out: list[list[dict[str, int | None]]] = []
     for table in re.findall(r"\{\|.*?\n\|\}", text, flags=re.S):
         if not re.search(r"(?:bCost|rCost)", table) or not re.search(r"(?:bTime|rTime)", table):
             continue
         result = []
         for block in re.split(r"\n\|-", table):
-            level_match = re.search(r"(?:^|\n)\|\s*(\d+)\s*(?:\n|$)", block)
-            cost_match = re.search(r"(?:bCost|rCost)[^|]*\|\s*([^\n|]+)", block)
-            time_match = re.search(r"(?:bTime|rTime)[^|]*\|\s*([^\n|]+)", block)
-            if not (level_match and cost_match and time_match):
+            level = _level_cell(block)
+            if level is None or level > 100:
                 continue
-            level = int(level_match.group(1))
-            if level <= 100:
-                result.append({"level": level, "cost": number(cost_match.group(1)), "time": seconds(time_match.group(1))})
+            cost, time = _cost_time_cells(block)
+            result.append({"level": level, "cost": cost, "time": time})
         if result:
-            return result
-    return []
+            tables_out.append(result)
+    return tables_out
 
 
 def page_candidates(item: dict) -> list[str]:
@@ -107,6 +133,10 @@ def page_candidates(item: dict) -> list[str]:
     # Guardians may be titled "Name/Guardian" on Fandom
     if item_type == "guardian":
         candidates.append(f"{name}/Guardian")
+    # The name itself may be a disambiguation page that routes to village sub-pages
+    # (spells, pets, equipment, helpers carry no village field in the slim data).
+    if village is None:
+        candidates.extend((f"{name}/Home Village", f"{name}/Builder Base"))
     candidates.extend((name, name.replace(" ", "_")))
     return list(dict.fromkeys(candidates))
 
@@ -127,7 +157,7 @@ def fetch_page(title: str) -> str | None:
 
 
 def main() -> int:
-    totals = {"match": 0, "mismatch": 0, "unverified": 0}
+    totals = {"match": 0, "mismatch": 0, "unverified": 0, "partial": 0}
     report = []
     for filename in FILES:
         source = json.loads((DATA / f"{filename}.json").read_text())
@@ -139,30 +169,47 @@ def main() -> int:
                 if text:
                     title = candidate
                     break
-            wiki = extract(text or "")
+            wiki_tables = extract(text or "")
             planner = item.get("levels", [])
-            comparable = []
-            # Fandom unit/hero/pet pages label the first paid upgrade as L1;
-            # planner data keeps the free starting state as L1. Align by the
-            # paid-step sequence when the wiki has exactly one fewer row.
-            wiki_offset = 1 if len(wiki) == len(planner) - 1 else 0
-            for row in wiki:
-                p = next((x for x in planner if x.get("l") == row["level"] + wiki_offset), None)
-                if p and row["cost"] is not None and row["time"] is not None:
-                    comparable.append((row, p))
-            mismatches = [
-                {"level": w["level"], "wiki": w, "planner": p}
-                for w, p in comparable
-                if w["cost"] != p.get("cost") or w["time"] != p.get("time")
-            ]
-            if mismatches:
+            planner_by_level = {lvl.get("l"): lvl for lvl in planner}
+
+            # A planner entity is verified against the wiki when, for *some*
+            # cost/time table on the page, every overlapping level agrees.
+            # (Wikitext pages carry multiple tables: main level, gear-up,
+            # supercharge/charge, boost, and per-module/per-resource variants.)
+            comparable_total = 0
+            matched_table = False
+            best_mismatch = None
+            best = None
+            for wiki in wiki_tables:
+                comparable = []
+                mismatches = []
+                for row in wiki:
+                    p = planner_by_level.get(row["level"])
+                    if p and row["cost"] is not None and row["time"] is not None:
+                        comparable.append(row["level"])
+                        if row["cost"] != p.get("cost") or row["time"] != p.get("time"):
+                            mismatches.append({"level": row["level"], "wiki": row, "planner": p})
+                comparable_total = max(comparable_total, len(comparable))
+                if not mismatches and comparable:
+                    matched_table = True
+                    break
+                if best is None or len(mismatches) < len(best[1]):
+                    best = (len(comparable), mismatches)
+                    best_mismatch = mismatches
+            if matched_table:
+                status = "match"
+                mismatches = []
+            elif best_mismatch:
                 status = "mismatch"
-            elif comparable:
-                status = "match" if len(comparable) == len(planner) else "unverified"
+                mismatches = best_mismatch
             else:
                 status = "unverified"
+                mismatches = []
+            if status == "match" and matched_table and comparable_total < len(planner):
+                status = "partial"
             totals[status] += 1
-            report.append({"file": filename, "id": item["_id"], "name": item["name"], "page": title, "planner_levels": len(planner), "wiki_rows": len(wiki), "compared": len(comparable), "status": status, "mismatches": mismatches})
+            report.append({"file": filename, "id": item["_id"], "name": item["name"], "page": title, "planner_levels": len(planner), "wiki_tables": len(wiki_tables), "compared": comparable_total, "status": status, "mismatches": mismatches})
     output = {"totals": totals, "entities": report}
     print(json.dumps(output, indent=2, ensure_ascii=False))
     return 1 if totals["mismatch"] else 0
