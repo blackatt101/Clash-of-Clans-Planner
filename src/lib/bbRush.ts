@@ -783,8 +783,9 @@ export function hideGearUpHomeRow(
   // Other buildings of the same type that aren't being geared up stay visible.
   const entry = entries.find((e) => e.uid === o.uid && e.village === o.village);
   if (!entry || entry.gearUp == null) return false;
-  // Outstanding: the Builder Base plan carries the gear-up (checklist row
-  // plus the Master Builder's trip). Settled: the building is a defence
-  // again and its upgrades are ordinary Home Village work.
-  return !gearUpSettled(entries, g, hasGearUpFlag(entries));
+  // Use the specific entry's gear_up flag directly (not the by-id aggregate
+  // functions) so that only the flagged instance is hidden. gear_up: 1 means
+  // the gear-up is complete and the building is a defence again; gear_up: 0
+  // means outstanding (in flight or pending) — hide the home row.
+  return entry.gearUp === 0;
 }
