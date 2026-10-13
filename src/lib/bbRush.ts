@@ -327,41 +327,28 @@ export const GEAR_UP_TRIP_SECONDS: Record<GearUpKey, number> = {
 /**
  * Whether a gear-up's Master Builder trip is *literally running right now*.
  *
- * The only "running" signal is the live timer on the Home Village building:
- * while the Master Builder is away on the journey, that building carries a
- * timer that counts down the trip itself. A normal level-up is minutes-to-hours
- * (e.g. Archer 13→14 is ~11 h), far shorter than half a multi-day trip, so a
- * timer of at least half the trip duration on the gear-up building is the
- * journey, not an ordinary upgrade.
+ * The data model is:
+ * - `gear_up` absent: building is in normal state, not geared up.
+ * - `gear_up: 0` with a timer: a gear-up is IN PROGRESS — the Master Builder
+ *   is away in the Home Village upgrading it. The timer counts down the trip.
+ * - `gear_up: 1`: the gear-up is COMPLETE (gearUpPerformed returns true).
+ *
+ * So `gear_up: 0` present on the Home Village entry is the authoritative
+ * "running now" signal. A timer must also be present (and positive) for the
+ * trip to still have time left; if the building already shows `gear_up: 0`
+ * with no timer, the trip finished between snapshots.
  */
 export function gearUpInFlight(entries: ParsedEntry[], g: GearUp): boolean {
-  const trip = GEAR_UP_TRIP_SECONDS[g.key];
-  // Timer signal: a live timer on the building at least half the trip length
-  // is the journey itself counting down — not an ordinary upgrade (minutes to
-  // hours, never days). This is the primary signal when the export carries a
-  // full-length timer.
-  const timerRunning = entries.some(
-    (e) =>
-      e.village === "home" &&
-      e.id === g.hvId &&
-      e.timer != null &&
-      e.timer > 0 &&
-      e.timer >= trip / 2,
+  const own = entries.find(
+    (e) => e.village === "home" && e.id === g.hvId,
   );
-  if (timerRunning) return true;
-  // Level signal: when the export has no timer (or a short one) but the
-  // building is already at the gear-up target level, the trip is still
-  // in progress. Gear-up buildings are special: their Home Village level is
-  // set by the game's gear-up mechanic, not by a normal builder queue. A
-  // building at or above hvTarget with the flag not yet set means the
-  // Master Builder's journey is underway even without a long timer.
-  if (levelOf(entries, g.hvId) >= g.hvTarget) {
-    const own = entries.find(
-      (e) => e.village === "home" && e.id === g.hvId,
-    );
-    if (!own || (own.gearUp ?? 0) === 0) return true;
-  }
-  return false;
+  if (!own || own.gearUp == null) return false;
+  // gear_up: 0 means the flag is set but the trip is not done — it's running.
+  if (own.gearUp !== 0) return false;
+  // There must be a live timer counting down. Zero or missing timer means
+  // the trip has just completed (the flag hasn't flipped yet between exports).
+  if (!own.timer || own.timer <= 0) return false;
+  return true;
 }
 
 /**
@@ -390,49 +377,40 @@ export function gearUpRemainingSeconds(
   g: GearUp,
 ): number | null {
   if (gearUpPerformed(entries, g)) return null;
-  const trip = GEAR_UP_TRIP_SECONDS[g.key];
-  const timer = entries.find(
-    (e) => e.village === "home" && e.id === g.hvId && e.timer != null && e.timer > 0,
-  )?.timer;
-  // Only a timer long enough to be the trip itself (the same threshold
-  // gearUpInFlight uses) counts as "the journey is running now". A short
-  // timer is an ordinary upgrade in progress, not the gear-up.
-  if (timer != null && timer >= trip / 2) return timer;
-  return null;
+  // The `gear_up: 0` flag on the Home Village entry means the trip is running;
+  // the remaining time is simply the building's live timer. No heuristic about
+  // timer length — the flag is authoritative.
+  const own = entries.find(
+    (e) => e.village === "home" && e.id === g.hvId,
+  );
+  if (!own || own.gearUp !== 0) return null;
+  if (!own.timer || own.timer <= 0) return null;
+  return own.timer;
 }
 
 /**
  * The single source of truth for "this gear-up needs no more home-plan work":
  *
  * - the export flags the trip as done (`gear_up` > 0),
- * - the trip is *in flight* — a home timer on the gear-up building long
- *   enough to be the Master Builder's journey (see `gearUpInFlight`),
+ * - the trip is *in flight* — `gear_up` field is `0` with a timer running,
  * - or, for exports without the flag, both halves of the requirement are
- *   already met, so the only remaining piece is the trip itself.
+ *   already met and the trip is not running.
  *
- * The in-flight case matters even when the flag is present but still 0: the
- * export records the building's *level* (kept after the gear-up) and flips
- * `gear_up` only on completion, so "trip running" is invisible to the flag
- * and only visible through the timer length. Every caller that used to
- * duplicate this flag / inference logic now goes through this one function.
+ * The `gear_up` field is authoritative: 0 = in progress, 1 = done. Its
+ * presence is the reliable signal, not timer-length heuristics.
  */
 export function gearUpSettled(
   entries: ParsedEntry[],
   g: GearUp,
   flagKnown: boolean,
 ): boolean {
-  // A gear-up is settled when its own entry's flag says it was performed, or
-  // when the building is at/past target and the trip is not running (checked
-  // by gearUpInFlight above). The flagKnown param is kept for API stability
-  // but the per-entry flag (own.gearUp) is the primary source of truth.
   if (gearUpPerformed(entries, g)) return true;
   const own = entries.find((e) => e.village === "home" && e.id === g.hvId);
   if (own && own.gearUp != null) {
-    // Own flag is present: gear_up=0 means the trip is pending, not settled.
-    return (own.gearUp ?? 0) > 0;
+    // gear_up: 0 means in-progress (not settled); gear_up: 1 means done (handled above).
+    return own.gearUp > 0;
   }
-  // No flag on this entry: settled only when both halves are met and the trip
-  // is not running.
+  // No flag on this entry: settled only when both halves are met and the trip is not running.
   if (gearUpInFlight(entries, g)) return false;
   return (
     levelOf(entries, g.bbId) >= g.bbTarget &&
