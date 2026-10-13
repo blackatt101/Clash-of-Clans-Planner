@@ -344,8 +344,10 @@ export const GEAR_UP_TRIP_SECONDS: Record<GearUpKey, number> = {
  * with no timer, the trip finished between snapshots.
  */
 export function gearUpInFlight(entries: ParsedEntry[], g: GearUp): boolean {
+  // Find the specific entry carrying the gear_up flag — not just any
+  // building with this ID, which might be a sibling without the flag.
   const own = entries.find(
-    (e) => e.village === "home" && e.id === g.hvId,
+    (e) => e.village === "home" && e.id === g.hvId && e.gearUp != null,
   );
   if (!own || own.gearUp == null) return false;
   // gear_up: 0 means the flag is set but the trip is not done — it's running.
@@ -385,8 +387,10 @@ export function gearUpRemainingSeconds(
   // The `gear_up: 0` flag on the Home Village entry means the trip is running;
   // the remaining time is simply the building's live timer. No heuristic about
   // timer length — the flag is authoritative.
+  // Find the specific entry carrying the gear_up flag — not just any building
+  // with this ID, which might be a sibling without the flag.
   const own = entries.find(
-    (e) => e.village === "home" && e.id === g.hvId,
+    (e) => e.village === "home" && e.id === g.hvId && e.gearUp != null,
   );
   if (!own || own.gearUp !== 0) return null;
   if (!own.timer || own.timer <= 0) return null;
@@ -410,7 +414,11 @@ export function gearUpSettled(
   flagKnown: boolean,
 ): boolean {
   if (gearUpPerformed(entries, g)) return true;
-  const own = entries.find((e) => e.village === "home" && e.id === g.hvId);
+  // Find the specific entry carrying the gear_up flag — not just any building
+  // with this ID, which might be a sibling without the flag.
+  const own = entries.find(
+    (e) => e.village === "home" && e.id === g.hvId && e.gearUp != null,
+  );
   if (own && own.gearUp != null) {
     // gear_up: 0 means in-progress (not settled); gear_up: 1 means done (handled above).
     return own.gearUp > 0;
