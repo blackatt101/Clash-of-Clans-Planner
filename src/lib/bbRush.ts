@@ -301,6 +301,11 @@ export function hasGearUpFlag(entries: ParsedEntry[]): boolean {
   return entries.some((e) => e.village === "home" && e.gearUp != null);
 }
 
+/** Whether any Home Village building with the given ID carries the gear-up flag. */
+export function hasGearUpFlagForId(entries: ParsedEntry[], id: number): boolean {
+  return entries.some((e) => e.village === "home" && e.id === id && e.gearUp != null);
+}
+
 /**
  * How long the home half of a gear-up takes per level, in the current rules.
  *
@@ -774,6 +779,10 @@ export function hideGearUpHomeRow(
   if (settings.builderBaseStrategy !== "rush6th") return false;
   const g = GEAR_UPS.find((g) => g.hvId === o.id);
   if (!g) return false;
+  // Only hide the specific building instance that carries the gear_up flag.
+  // Other buildings of the same type that aren't being geared up stay visible.
+  const entry = entries.find((e) => e.uid === o.uid && e.village === o.village);
+  if (!entry || entry.gearUp == null) return false;
   // Outstanding: the Builder Base plan carries the gear-up (checklist row
   // plus the Master Builder's trip). Settled: the building is a defence
   // again and its upgrades are ordinary Home Village work.

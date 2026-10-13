@@ -585,12 +585,13 @@ export function computeUpgrades(
       }
     }
 
-    // Skip the row entirely while the gear-up is outstanding: the
+    // Hide this specific entry while its gear-up is outstanding: the
     // Master Builder's trip is planned on the Builder Base plan, whose
     // checklist also tracks this building's level requirement, so the
     // building has no place in the Home Village catalogue until the
-    // gear-up is done and it is a defence again.
-    if (settings && hideGearUpHomeRow({ id: e.id, village: e.village, currentLevel: from } as UpgradeOption, pv.entries, settings)) {
+    // gear-up is done and it is a defence again. Other buildings of the
+    // same type that aren't geared up remain visible.
+    if (settings && hideGearUpHomeRow({ uid: e.uid, id: e.id, village: e.village, currentLevel: from } as UpgradeOption, pv.entries, settings)) {
       continue;
     }
 
