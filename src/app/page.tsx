@@ -239,7 +239,7 @@ function planAllAvailable(
   settings: PlannerSettings,
 ): Set<number> {
   const set = new Set<number>();
-  const opts = computeUpgrades(pv, gameData);
+  const opts = computeUpgrades(pv, gameData, settings);
   for (const o of opts) {
     if (!o.available) continue;
     if (UNSCHEDULED_CATEGORIES.has(o.category)) continue;
@@ -548,8 +548,8 @@ export default function Home() {
   );
 
   const upgrades = useMemo(
-    () => (parsed && gameData ? computeUpgrades(parsed, gameData) : []),
-    [parsed, gameData],
+    () => (parsed && gameData ? computeUpgrades(parsed, gameData, settings) : []),
+    [parsed, gameData, settings],
   );
 
   const optionById = useMemo(

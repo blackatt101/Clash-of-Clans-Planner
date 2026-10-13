@@ -25,7 +25,8 @@ export type BbBuilders = "auto" | 1 | 2 | 3;
 /**
  * Builder Base presets. "Rush 6th Builder" is the one that matches why people
  * play the Builder Base at all, so it is the default and it is the one that
- * reaches back into the Home Village plan (see `gearUpHomeBoost`).
+ * reaches back into the Home Village plan (see `hideGearUpHomeRow`: while a
+ * gear-up is outstanding, its Home Village building is planned here instead).
  */
 export const BB_STRATEGIES: {
   value: BuilderBaseStrategy;

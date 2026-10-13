@@ -3,8 +3,8 @@ npm notice run next start -p 3000
 ▲ Next.js 16.3.5
 - Local:         http://localhost:3000
 - Network:       http://172.31.45.153:3000
-✓ Ready in 109ms
+✓ Ready in 99ms
 ⚠ Warning: Next.js ignored package-lock.json in /home/ubuntu because it is outside the current Git repository (/home/ubuntu/coc-planner).
  To use this directory, set `outputFileTracingRoot` in your Next.js config.
 
-✓ Running next.config.ts took 36ms
+✓ Running next.config.ts took 24ms

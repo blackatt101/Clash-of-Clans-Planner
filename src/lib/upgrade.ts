@@ -1,7 +1,13 @@
-import { BB_BOB_CONTROL, BB_HERO_IDS, SIEGE_MACHINE_IDS } from "./bbRush";
+import {
+  BB_BOB_CONTROL,
+  BB_HERO_IDS,
+  SIEGE_MACHINE_IDS,
+  hideGearUpHomeRow,
+} from "./bbRush";
 import type { GameData } from "./staticData";
 import { townHallIdFor, type ParsedEntry, type ParsedVillage } from "./parse";
 import type { Cost, Village, Category } from "./types";
+import type { PlannerSettings } from "./settings";
 import { computeMissingBuildings } from "./gameLogic";
 
 
@@ -454,6 +460,7 @@ function unlockOptions(pv: ParsedVillage, data: GameData): UpgradeOption[] {
 export function computeUpgrades(
   pv: ParsedVillage,
   data: GameData,
+  settings?: PlannerSettings,
 ): UpgradeOption[] {
   const opts: UpgradeOption[] = [];
   const facilities: Record<Village, Map<number, number>> = {
@@ -577,6 +584,16 @@ export function computeUpgrades(
           chain.push({ level: row.l, cost: row.cost, time: row.time });
       }
     }
+
+    // Skip the row entirely while the gear-up is outstanding: the
+    // Master Builder's trip is planned on the Builder Base plan, whose
+    // checklist also tracks this building's level requirement, so the
+    // building has no place in the Home Village catalogue until the
+    // gear-up is done and it is a defence again.
+    if (settings && hideGearUpHomeRow({ id: e.id, village: e.village, currentLevel: from } as UpgradeOption, pv.entries, settings)) {
+      continue;
+    }
+
     opts.push({
       uid: e.uid,
       id: e.id,

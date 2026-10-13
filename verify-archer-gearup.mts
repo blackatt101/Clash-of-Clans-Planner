@@ -7,10 +7,10 @@ import { readFileSync } from "node:fs";
 const data = new GameData() as any;
 data.byId = new Map();
 for (const f of ["buildings", "troops", "heroes", "spells", "pets", "equipment", "traps", "helpers"]) {
-  const j = JSON.parse(readFileSync(`/root/coc-planner/public/data/${f}.json`, "utf8"));
+  const j = JSON.parse(readFileSync(`public/data/${f}.json`, "utf8"));
   for (const item of j.items) if (!data.byId.has(item._id)) data.byId.set(item._id, item);
 }
-const raw = JSON.parse(readFileSync("/root/coc-planner/test-export.json", "utf8"));
+const raw = JSON.parse(readFileSync("test-export.json", "utf8"));
 const pv = await parseExport(raw, data);
 
 const settings = {

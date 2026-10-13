@@ -769,67 +769,35 @@ export function bobCriticalTargets(
 
 
 /**
- * Priority boost for the Home Village half of a gear-up.
+ * Whether a Home-Village upgrade row for a gear-up building should be
+ * shown in the home-village upgrade catalogue at all.
  *
- * This is the whole reason a Builder Base plan exists: three Home Village
- * buildings have to reach a level before the Master Builder can gear them up,
- * and the 6th builder is behind that. So when the Builder Base is being rushed,
- * the Home Village plan gives those three a nudge — a Cannon at 6 is worth more
- * than a Cannon at 7 only because 7 is what the gear-up needs.
+ * A gear-up is Master Builder work, and the Master Builder lives in the
+ * Builder Base: the Builder Base plan books his trip on its own lane, and
+ * its checklist already tracks both halves of the requirement — the
+ * Builder Base level in the row, the Home Village level in the row's
+ * note, with a `needsHome` flag when that half is still short. So while
+ * the 6th-builder rush is active and a gear-up is still outstanding, the
+ * building's Home Village rows stay out of the Home Village plan: until
+ * the trip is done, that building is the Builder Base plan's business.
  *
- * Only the levels up to the requirement are boosted; past it the building is
- * just a defence again.
- */
-export function gearUpHomeBoost(
-  _o: UpgradeOption,
-  _entries: ParsedEntry[],
-  _settings: PlannerSettings,
-): number {
-  // Gear-up buildings are now treated as regular defences in the Home Village
-  // plan and are not given any priority boost. The Builder Base plan handles the
-  // Master Builder's gear-up trip separately when the 6th-builder rush is active.
-  return 0;
-}
-
-/**
- * The Home-Village half of a gear-up, as a *cap* on that building's upgrades
- * in the home plan.
- *
- * When the 6th-builder rush is active, a gear-up building's home level matters
- * only up to its target — the Master Builder's trip (scheduled on the Builder
- * Base plan) is what completes the gear-up, not a further home-village upgrade.
- * Past the target the building is just a defence again, so the home plan should
- * not offer 13→14, 14→15, etc. as plan rows. This returns the target level for
- * a building that is a gear-up half (or null when it is not / not in rush mode),
- * so the caller can stop chaining that building's home upgrades at that level.
- *
- * Mirrors `gearUpHomeBoost`: a gear-up that is already finished (per the export's
- * `gear_up` flag, or by both-halves-met inference) yields no cap — the building
- * is free to be upgraded as a normal defence.
- */
-/**
- * Whether a Home-Village upgrade row for a gear-up building should be shown in
- * the home-village upgrade catalogue at all.
- *
- * When the 6th-builder rush is active, a gear-up's Home Village building has
- * only one job: reach the level the Master Builder's trip needs. Once the
- * gear-up is done — per the export's `gear_up` flag, or by both-halves-met
- * inference for exports without the flag — the building is just a defence
- * again and the next-level row is a free upgrade, which is exactly what the
- * user is reporting: "Archer Tower 13→14 sitting in my home plan even though
- * the gear-up is done and the trip is on the Builder Base plan".
- *
- * So: hide the row only when the gear-up is already done AND the building's
- * current level is at or above the gear-up target (i.e. the next step is
- * purely post-gear-up defence work). While the gear-up is still outstanding,
- * every home step below the target stays visible — those are the actual
- * work the trip requires.
+ * Once the gear-up is settled — per the export's `gear_up` flag, or the
+ * both-halves-met inference for exports without the flag — the building is
+ * a defence again (the gear-up only adds a second mode; it does not change
+ * the building irreversibly), and its rows return to the Home Village plan
+ * like any other defence's.
  */
 export function hideGearUpHomeRow(
-  _o: UpgradeOption,
-  _entries: ParsedEntry[],
-  _settings: PlannerSettings,
+  o: UpgradeOption,
+  entries: ParsedEntry[],
+  settings: PlannerSettings,
 ): boolean {
-  // Gear-up buildings are now always visible in the Home Village plan.
-  return false;
+  // The gear-up plan only exists in the mode that plans it.
+  if (settings.builderBaseStrategy !== "rush6th") return false;
+  const g = GEAR_UPS.find((g) => g.hvId === o.id);
+  if (!g) return false;
+  // Outstanding: the Builder Base plan carries the gear-up (checklist row
+  // plus the Master Builder's trip). Settled: the building is a defence
+  // again and its upgrades are ordinary Home Village work.
+  return !gearUpSettled(entries, g, hasGearUpFlag(entries));
 }
