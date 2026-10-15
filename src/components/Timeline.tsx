@@ -338,7 +338,7 @@ export default function Timeline({
     const d = details.get(job.uid);
     return {
       name: d?.name ?? job.name,
-      level: d ? `${d.currentLevel}→${d.nextLevel}` : "",
+      level: d ? (d.gearUp ? "" : `${d.currentLevel}→${d.nextLevel}`) : "",
       copy: job.instances > 1 ? `${job.instance}/${job.instances}` : "",
       icon: d ? images[String(d.id)] : undefined,
     };
@@ -404,7 +404,7 @@ export default function Timeline({
           which in turn sits over the bars (z-2) — you can see an upgrade running
           through a window you are asleep for. */}
       <div className="overflow-hidden rounded-2xl border border-line bg-surface/40">
-        <div ref={scrollRef} className="tl-scroll overflow-x-auto scroll-pl-3 scroll-pl-40">
+        <div ref={scrollRef} className="tl-scroll overflow-x-auto scroll-pl-40">
           <div
             className="tl-chart relative"
             style={{ width: LABEL_W + contentW }}
@@ -761,16 +761,27 @@ export default function Timeline({
               />
             )}
             <div className="min-w-0">
-              <div className="font-semibold text-ink">
-                {selectedDetail.name}
+              <div className="flex flex-wrap items-center gap-2 font-semibold text-ink">
+                <span>{selectedDetail.name}</span>
+                {selectedDetail.gearUp && (
+                  <span className="rounded bg-amber-400/20 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-amber-400 ring-1 ring-amber-400/40">
+                    Gear Up
+                  </span>
+                )}
                 {selectedJob.instances > 1 && (
-                  <span className="ml-2 rounded bg-white/5 px-1.5 py-px text-xs font-bold text-ink-dim ring-1 ring-white/10">
+                  <span className="rounded bg-white/5 px-1.5 py-px text-xs font-bold text-ink-dim ring-1 ring-white/10">
                     copy {selectedJob.instance} of {selectedJob.instances}
                   </span>
                 )}
               </div>
               <div className="text-xs text-ink-dim">
-                Level {selectedDetail.currentLevel} → {selectedDetail.nextLevel}
+                {selectedDetail.gearUp ? (
+                  <span>Master Builder Trip · Home Village {selectedDetail.gearUp.hvName}</span>
+                ) : (
+                  <>
+                    Level {selectedDetail.currentLevel} → {selectedDetail.nextLevel}
+                  </>
+                )}
                 {selectedJob.inProgress && (
                   <span className="ml-2 text-amber-300">· running now</span>
                 )}
@@ -839,6 +850,11 @@ export default function Timeline({
               <span className="truncate text-[13px] font-bold leading-tight text-white">
                 {hoverDetail?.name ?? hover.name}
               </span>
+              {hoverDetail?.gearUp && (
+                <span className="shrink-0 rounded bg-amber-400/20 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-amber-300 ring-1 ring-amber-400/40">
+                  Gear Up
+                </span>
+              )}
               {hover.instances > 1 && (
                 <span className="ml-auto shrink-0 rounded bg-white/10 px-1.5 py-px text-[10px] font-bold text-white/85">
                   {hover.instance}/{hover.instances}
@@ -847,8 +863,14 @@ export default function Timeline({
             </div>
             {hoverDetail && (
               <div className="mt-1 text-[11px] text-white/70">
-                Level {hoverDetail.currentLevel} → {hoverDetail.nextLevel}
-                {hover.instances > 1 && " · one copy"}
+                {hoverDetail.gearUp ? (
+                  <span>Master Builder Trip · Home Village {hoverDetail.gearUp.hvName}</span>
+                ) : (
+                  <>
+                    Level {hoverDetail.currentLevel} → {hoverDetail.nextLevel}
+                    {hover.instances > 1 && " · one copy"}
+                  </>
+                )}
               </div>
             )}
             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/80">

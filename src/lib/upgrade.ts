@@ -3,6 +3,7 @@ import {
   BB_HERO_IDS,
   SIEGE_MACHINE_IDS,
   hideGearUpHomeRow,
+  type GearUp,
 } from "./bbRush";
 import type { GameData } from "./staticData";
 import { townHallIdFor, type ParsedEntry, type ParsedVillage } from "./parse";
@@ -33,6 +34,10 @@ export interface UpgradeOption {
   gate?: LevelGate;
   available: boolean;
   count: number;
+  /**
+   * Set on a Gear Up candidate in the B.O.B plan (Master Builder trip).
+   */
+  gearUp?: GearUp;
   /**
    * Seconds left on the upgrade already running for this entry, if any. The
    * export reports `lvl` as the level the entry is CURRENTLY at, so an entry
@@ -211,6 +216,9 @@ export function inFlightOption(
   data: GameData,
 ): UpgradeOption | null {
   if (!e.entity || !e.timer || e.timer <= 0) return null;
+  // A Home Village gear-up in flight (gear_up: 0 with a live timer) is handled
+  // by the Master Builder from Builder Hall, not as a normal level-up in Home Village.
+  if (e.village === "home" && e.gearUp === 0) return null;
   // An entry already at its absolute max cannot be mid-upgrade, so a timer on
   // it is stale (a hand-edited or cached export) and gets no row: a step above
   // the max does not exist, and claiming one would let a consumer schedule it.
@@ -482,7 +490,25 @@ export function computeUpgrades(
 
   for (const e of pv.entries) {
     if (!e.entity) continue;
-    const inFlight = e.timer != null && e.timer > 0;
+
+    // Hide this specific entry while its gear-up is outstanding or in flight:
+    // the Master Builder's trip is planned on the Builder Base plan, so the
+    // building has no place in the Home Village catalogue until the gear-up
+    // is done and it is a defence again. Other buildings of the same type
+    // that aren't geared up remain visible.
+    if (
+      settings &&
+      hideGearUpHomeRow(
+        { uid: e.uid, id: e.id, village: e.village, currentLevel: e.level } as UpgradeOption,
+        pv.entries,
+        settings,
+      )
+    ) {
+      continue;
+    }
+
+    const isGearUpInFlight = e.village === "home" && e.gearUp === 0 && e.timer != null && e.timer > 0;
+    const inFlight = e.timer != null && e.timer > 0 && !isGearUpInFlight;
     const from = inFlight ? e.level + 1 : e.level;
     const next = data.level(e.entity, from + 1);
 
@@ -583,16 +609,6 @@ export function computeUpgrades(
         if (row.l > next.l && row.l <= ceiling)
           chain.push({ level: row.l, cost: row.cost, time: row.time });
       }
-    }
-
-    // Hide this specific entry while its gear-up is outstanding: the
-    // Master Builder's trip is planned on the Builder Base plan, whose
-    // checklist also tracks this building's level requirement, so the
-    // building has no place in the Home Village catalogue until the
-    // gear-up is done and it is a defence again. Other buildings of the
-    // same type that aren't geared up remain visible.
-    if (settings && hideGearUpHomeRow({ uid: e.uid, id: e.id, village: e.village, currentLevel: from } as UpgradeOption, pv.entries, settings)) {
-      continue;
     }
 
     opts.push({

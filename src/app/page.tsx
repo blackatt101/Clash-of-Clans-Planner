@@ -190,11 +190,11 @@ function scheduleToText(
     lines.push(`${lane.label}:`);
     for (const j of lane.jobs) {
       const d = details.get(j.uid);
-      const level = d ? `${d.currentLevel}→${d.nextLevel}` : "";
+      const level = d ? (d.gearUp ? "" : ` ${d.currentLevel}→${d.nextLevel}`) : "";
       const timing = j.inProgress
         ? `${formatTime(j.duration)} left`
         : `${formatTime(j.duration)} starting ${fmtDateTime(nowEpochMs + j.start * 1000)}`;
-      lines.push(`  ${j.name} ${level} · ${timing}`);
+      lines.push(`  ${j.name}${level} · ${timing}`);
     }
     lines.push("");
   }
@@ -367,9 +367,10 @@ export default function Home() {
         window.location.hash = "";
         return;
       }
-      // A link that decodes but will not parse is a broken link, not a village:
-      // clear it so the address bar stops claiming otherwise, and fall through.
-      if (state) window.location.hash = "";
+      // A link that decodes but will not parse or fails to decode is a broken link:
+      // clear it so the address bar stops claiming otherwise, and inform the user.
+      window.location.hash = "";
+      setParseError("Could not load shared plan — the link may be incomplete or corrupted.");
     }
     const saved = loadSavedVillage();
     const savedPv = saved ? safeParseExport(saved.export, gameData) : null;
@@ -560,6 +561,9 @@ export default function Home() {
   // Upgrades already running, from the export's live `timer`. Keyed in their own
   // uid space and given their own detail rows, so a bar for work in flight never
   // resolves to the follow-up upgrade of the same entry.
+  // Home Village gear-ups in flight (gearUp: 0 with a live timer) use the Master
+  // Builder from Builder Base and are tracked on the Builder Base plan — they
+  // must not consume a Home Village builder or appear as a normal level-up.
   const inProgress = useMemo<ScheduleJob[]>(() => {
     if (!parsed) return [];
     return parsed.entries
@@ -568,7 +572,8 @@ export default function Home() {
           e.village === village &&
           e.entity &&
           e.timer &&
-          e.timer > 0,
+          e.timer > 0 &&
+          !(e.village === "home" && e.gearUp === 0),
       )
       .map((e) => ({
         uid: IN_FLIGHT_UID_BASE + e.uid,
@@ -599,6 +604,7 @@ export default function Home() {
     if (!parsed || !gameData) return m;
     for (const e of parsed.entries) {
       if (e.village !== village || !e.entity || !e.timer || e.timer <= 0) continue;
+      if (e.village === "home" && e.gearUp === 0) continue;
       const o = inFlightOption(e, gameData);
       if (o) m.set(IN_FLIGHT_UID_BASE + e.uid, o);
     }
@@ -617,7 +623,12 @@ export default function Home() {
       new Map<number, number>(
         parsed
           ? parsed.entries
-              .filter((e) => e.timer && e.timer > 0)
+              .filter(
+                (e) =>
+                  e.timer &&
+                  e.timer > 0 &&
+                  !(e.village === "home" && e.gearUp === 0),
+              )
               .map((e) => [e.uid, e.timer as number])
           : [],
       ),
@@ -648,10 +659,14 @@ export default function Home() {
   // once via a lazy state initializer so the memo never calls an impure
   // function during render.
   const [pageLoadEpochMs] = useState(() => Date.now());
-  const nowEpochMs = useMemo(
-    () => (rawExport?.timestamp ? rawExport.timestamp * 1000 : pageLoadEpochMs),
-    [rawExport, pageLoadEpochMs],
-  );
+  const nowEpochMs = useMemo(() => {
+    const ts = rawExport?.timestamp;
+    if (typeof ts === "number" && Number.isFinite(ts) && ts > 0) {
+      // CoC export timestamp is in seconds; accept milliseconds if already scaled (>1e11).
+      return ts > 1e11 ? ts : ts * 1000;
+    }
+    return pageLoadEpochMs;
+  }, [rawExport, pageLoadEpochMs]);
 
   // Builder Base builders, read off the export: the Master Builder, O.T.T.O
   // (who arrives with Builder Hall 6) and B.O.T.O (bought with gems). None of

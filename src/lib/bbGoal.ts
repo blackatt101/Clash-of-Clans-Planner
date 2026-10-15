@@ -402,6 +402,8 @@ export function scheduleBobGoal(o: BobGoalOptions): BobGoalResult {
     place(ip, bi);
   }
 
+  const options: UpgradeOption[] = [];
+
   // In-progress gear-up trips: the Home Village building carries a live timer
   // (the Master Builder's journey running as that building's upgrade). It is
   // in progress at t=0, and its remaining duration is the timer itself — not
@@ -433,6 +435,21 @@ export function scheduleBobGoal(o: BobGoalOptions): BobGoalResult {
         },
         bi,
       );
+      options.push({
+        uid,
+        id: g.bbId,
+        name: g.label,
+        category: "building",
+        village: "builderBase",
+        resource: "Builder Gold",
+        currentLevel: g.bbTarget,
+        nextLevel: g.bbTarget,
+        cost: null,
+        time: remaining,
+        available: true,
+        count: 1,
+        gearUp: g,
+      });
       placed++;
     }
   }
@@ -486,7 +503,6 @@ export function scheduleBobGoal(o: BobGoalOptions): BobGoalResult {
    * and only if the plan's own Star Lab chain never reaches its level.
    */
   const pendingLabGates = new Set<{ label: string; level: number; labNeed: number }>();
-  const options: UpgradeOption[] = [];
   /**
    * The first requirement each resource's ceiling could not pay for, which is
    * the plan's own reason for the storage work it adds. Reported on the card so
@@ -866,6 +882,7 @@ export function scheduleBobGoal(o: BobGoalOptions): BobGoalResult {
       time: c.gearUp ? c.duration : (found?.step.time ?? null),
       available: true,
       count: 1,
+      gearUp: c.gearUp,
     });
     if (c.storage) {
       // One copy, not the entity: the other copy keeps its own level, and the

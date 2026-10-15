@@ -255,7 +255,6 @@ export const BB_DEFENSE_OPTIONS: { id: number; name: string }[] = [
   { id: 1000056, name: "Roaster" },
   { id: 1000057, name: "Giant Cannon" },
   { id: 1000063, name: "Lava Launcher" },
-  { id: 1000081, name: "X-Bow" },
 ];
 
 /** Combined current level of the two Builder Base heroes. */
@@ -781,16 +780,20 @@ export function bobCriticalTargets(
 export function hideGearUpHomeRow(
   o: UpgradeOption,
   entries: ParsedEntry[],
-  settings: PlannerSettings,
+  settings?: PlannerSettings,
 ): boolean {
-  // The gear-up plan only exists in the mode that plans it.
-  if (settings.builderBaseStrategy !== "rush6th") return false;
   const g = GEAR_UPS.find((g) => g.hvId === o.id);
   if (!g) return false;
   // Only hide the specific building instance that carries the gear_up flag.
   // Other buildings of the same type that aren't being geared up stay visible.
   const entry = entries.find((e) => e.uid === o.uid && e.village === o.village);
   if (!entry || entry.gearUp == null) return false;
+  // If a gear-up is actively in flight (gear_up: 0 with a live timer), this building
+  // is busy with the Master Builder and cannot be upgraded in Home Village, regardless
+  // of builder base strategy setting.
+  if (entry.gearUp === 0 && entry.timer != null && entry.timer > 0) return true;
+  // The gear-up plan only exists in the mode that plans it.
+  if (settings && settings.builderBaseStrategy !== "rush6th") return false;
   // Use the specific entry's gear_up flag directly (not the by-id aggregate
   // functions) so that only the flagged instance is hidden. gear_up: 1 means
   // the gear-up is complete and the building is a defence again; gear_up: 0

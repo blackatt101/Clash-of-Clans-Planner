@@ -227,7 +227,13 @@ export default function Schedule({
                           </span>
                           {d && (
                             <span className="shrink-0 text-xs text-ink-faint">
-                              {d.currentLevel}→{d.nextLevel}
+                              {d.gearUp ? (
+                                <span className="rounded bg-amber-400/20 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-amber-400 ring-1 ring-amber-400/30">
+                                  Gear Up
+                                </span>
+                              ) : (
+                                `${d.currentLevel}→${d.nextLevel}`
+                              )}
                             </span>
                           )}
                           {copies > 1 && (
