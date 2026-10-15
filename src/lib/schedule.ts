@@ -350,15 +350,87 @@ export function scheduleJobs(
    */
   const respectHeroCap = (job: Instance, start: number): number => {
     const cap = opts.heroConcurrency;
-    if (cap == null || job.category !== "hero") return start;
-    if (cap < 1) return start;
-    for (let guard = 0; guard < 64; guard++) {
-      const overlapping = heroSpans.filter(
-        (h) => h.end > start && h.start < start + job.duration,
-      );
-      if (overlapping.length < cap) break;
-      start = Math.min(...overlapping.map((h) => h.end));
+    if (cap == null || job.category !== "hero" || cap < 1) return start;
+    let violationPoint: number | null = null;
+    const maxGuard = Math.max(128, heroSpans.length * 2);
+    for (let guard = 0; guard < maxGuard; guard++) {
+      const end = start + job.duration;
+      const overlapping = heroSpans.filter((h) => h.end > start && h.start < end);
+      if (overlapping.length < cap) {
+        violationPoint = null;
+        break;
+      }
+
+      const checkPoint = (t: number): boolean => {
+        let count = 0;
+        for (const h of overlapping) {
+          if (h.start <= t && t < h.end) count++;
+        }
+        return count >= cap;
+      };
+
+      violationPoint = null;
+      if (checkPoint(start)) {
+        violationPoint = start;
+      } else {
+        const starts = overlapping
+          .map((h) => h.start)
+          .filter((s) => s > start && s < end)
+          .sort((a, b) => a - b);
+        for (const s of starts) {
+          if (checkPoint(s)) {
+            violationPoint = s;
+            break;
+          }
+        }
+      }
+
+      if (violationPoint === null) break;
+
+      const vp = violationPoint;
+      const activeEnds = overlapping
+        .filter((h) => h.start <= vp && vp < h.end)
+        .map((h) => h.end);
+      const nextStart = Math.min(...activeEnds);
+      if (nextStart <= start) {
+        const maxActiveEnd = Math.max(...activeEnds);
+        start = maxActiveEnd > start ? maxActiveEnd : start + 1;
+      } else {
+        start = nextStart;
+      }
     }
+
+    if (violationPoint !== null) {
+      // Guard-exhaustion fallback: find the earliest candidate end timestamp >= start
+      // that is provably free of instantaneous concurrency violations across [pt, pt + duration).
+      const candidatePoints = Array.from(
+        new Set(heroSpans.map((h) => h.end).filter((e) => e >= start)),
+      ).sort((a, b) => a - b);
+
+      for (const pt of candidatePoints) {
+        const ptEnd = pt + job.duration;
+        const ptOver = heroSpans.filter((h) => h.end > pt && h.start < ptEnd);
+        let valid = true;
+        const checkPoints = [pt, ...ptOver.map((h) => h.start).filter((s) => s > pt && s < ptEnd)];
+        for (const cp of checkPoints) {
+          const count = ptOver.filter((h) => h.start <= cp && cp < h.end).length;
+          if (count >= cap) {
+            valid = false;
+            break;
+          }
+        }
+        if (valid) {
+          start = pt;
+          violationPoint = null;
+          break;
+        }
+      }
+
+      if (violationPoint !== null && heroSpans.length > 0) {
+        start = Math.max(start, ...heroSpans.map((h) => h.end));
+      }
+    }
+
     return start;
   };
 
