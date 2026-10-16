@@ -27,11 +27,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         {/* Dev error-capture: POST unhandled browser errors to /api/debug so a
             broken build shows up in the server log, tagged with the build id. */}
-        <Script
-          id="error-capture"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){
+        {process.env.NODE_ENV !== "production" && (
+          <Script
+            id="error-capture"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `(function(){
   window.__CLASH_BUILD_ID__ = "${BUILD_ID}";
   function send(extra){
     try{
@@ -46,8 +47,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     send({ message:'unhandledrejection', reason:String(e.reason), stack:(e.reason&&e.reason.stack)||'', type:'rejection' });
   });
 })();`,
-          }}
-        />
+            }}
+          />
+        )}
       </body>
     </html>
   );

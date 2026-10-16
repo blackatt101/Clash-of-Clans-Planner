@@ -7,6 +7,7 @@
 // document itself must revalidate on each visit so the browser picks up new
 // chunk names.
 const nextConfig = {
+  poweredByHeader: false,
   async headers() {
     return [
       {
@@ -15,6 +16,22 @@ const nextConfig = {
           {
             key: "Cache-Control",
             value: "public, max-age=0, must-revalidate",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "SAMEORIGIN",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
           },
         ],
       },

@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "if grep -q '^NEXT_PUBLIC_BUILD_ID=' .env.local 2>/dev/null; then sed -i \"s|^NEXT_PUBLIC_BUILD_ID=.*|NEXT_PUBLIC_BUILD_ID=$(date +%s%N)|\" .env.local; else echo \"NEXT_PUBLIC_BUILD_ID=$(date +%s%N)\" >> .env.local; fi && next build",
-    "start": "next start -p ${PORT:-3000}",
-    "start:direct": "next start -p 3000",
+    "start": "next start -H 127.0.0.1 -p ${PORT:-3000}",
+    "start:direct": "next start -H 127.0.0.1 -p 3000",
     "lint": "eslint",
-    "test:attack": "npx tsx scripts/attack-tests.mts"
+    "test:attack": "npx tsx scripts/attack-tests.mts",
+    "test:security": "npx tsx scripts/security-tests.mts"
   },
   "dependencies": {
     "next": "16.3.5",
