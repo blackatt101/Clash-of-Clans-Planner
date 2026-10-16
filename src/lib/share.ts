@@ -23,7 +23,18 @@ function toBase64url(s: string): string {
 }
 
 function fromBase64url(b: string): string {
-  const bin = atob(b.replace(/-/g, "+").replace(/_/g, "/"));
+  let clean = b.trim();
+  try {
+    clean = decodeURIComponent(clean);
+  } catch {
+    /* keep raw clean string if decodeURIComponent fails */
+  }
+  if (clean.startsWith("state=")) clean = clean.slice(6);
+  let normalized = clean.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = normalized.length % 4;
+  if (pad === 2) normalized += "==";
+  else if (pad === 3) normalized += "=";
+  const bin = atob(normalized);
   const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }

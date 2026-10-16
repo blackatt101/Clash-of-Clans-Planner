@@ -89,7 +89,7 @@ export default function ImportPanel({
     try {
       if (!navigator.clipboard?.readText) {
         setClipError(
-          "This connection isn't HTTPS, so the browser blocks automatic clipboard reading — click the box and press Ctrl+V; it parses instantly.",
+          "Clipboard auto-read is unavailable or blocked by browser permissions — click the box and press Ctrl+V; it parses instantly.",
         );
         requestAnimationFrame(() => taRef.current?.focus());
         return;
@@ -235,7 +235,7 @@ export default function ImportPanel({
           </button>
         </div>
         <p className="mt-3 text-xs text-ink-faint">
-          On HTTP (this server), clipboard auto-read is blocked by browsers. Use Ctrl+V in the box below — it parses instantly.
+          If clipboard auto-read is blocked by your browser, use Ctrl+V in the box below — it parses instantly.
         </p>
 
         {clipError && (

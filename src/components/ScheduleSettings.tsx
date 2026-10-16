@@ -613,7 +613,7 @@ export default function ScheduleSettings({
                 <option value="">Auto (highest defense)</option>
                 {BB_DEFENSE_OPTIONS.map((d) => (
                   <option key={d.id} value={String(d.id)}>
-                    {d.id === 1000081 ? `${d.name} — caps at 5, auto pick instead` : d.name}
+                    {d.name}
                   </option>
                 ))}
               </select>

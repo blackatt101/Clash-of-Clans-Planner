@@ -75,6 +75,7 @@ export default function UpgradeList({
 }: Props) {
   const [query, setQuery] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [mountMs] = useState(() => Date.now());
   // Default-collapsed: the catalogue can be hundreds of rows, and drawing them
   // all up front is most of the page's render cost — so it opens on demand.
   // The toolbar's Expand / Collapse still wins when the user uses it.
@@ -147,7 +148,15 @@ export default function UpgradeList({
 
   const availableCount = useMemo(() => options.filter((o) => o.available).length, [options]);
   const plannedCount = useMemo(() => options.filter((o) => planned.has(o.uid)).length, [options, planned]);
-  const remaining = nowMs - nowEpochMs;
+  // Elapsed seconds since the export snapshot.
+  // For normal past exports (nowEpochMs <= mountMs): elapsed time is (nowMs - nowEpochMs).
+  // For future timestamps (e.g. sample data or skewed clocks where nowEpochMs > mountMs):
+  // elapsed time is measured from page mount (nowMs - mountMs) so future timestamps
+  // do not produce negative elapsed time or inflate/zero valid timers.
+  const elapsedSec =
+    nowEpochMs > mountMs
+      ? Math.max(0, Math.floor((nowMs - mountMs) / 1000))
+      : Math.max(0, Math.floor((nowMs - nowEpochMs) / 1000));
 
   /**
    * The climb a row stands for: its next step plus every follow-up level the
@@ -288,7 +297,7 @@ export default function UpgradeList({
                     // cost of finishing it, not just of the first step.
                     const climb = scheduleable ? climbOf(o) : null;
                     const remainingSec = timerByUid.has(o.uid)
-                      ? Math.max(0, (timerByUid.get(o.uid) ?? 0) - Math.floor(remaining / 1000))
+                      ? Math.max(0, (timerByUid.get(o.uid) ?? 0) - elapsedSec)
                       : null;
                     return (
                       <div
