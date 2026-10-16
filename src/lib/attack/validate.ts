@@ -21,7 +21,7 @@
  *    decision list (never silently ignored); used heroes need a
  *    role, excluded heroes need a reason (repaired when missing);
  *    the battlefield hero slots (one opens every two Town Halls
- *    from TH7: TH9=2, TH11=3, TH13=4, TH15=5) are enforced —
+ *    from TH7: TH7-8=1, TH9-10=2, TH11-12=3, TH13-18=4) are enforced —
  *    extras are excluded with the limit as their reason, and
  *    their deployment steps / paths / abilities are dropped
  *  - candidate strategies -> resolved against the canonical
@@ -77,6 +77,50 @@ export function clampPoint(p: unknown): Point {
     x: Math.min(CLAMP.maxX, Math.max(CLAMP.minX, x)),
     y: Math.min(CLAMP.maxY, Math.max(CLAMP.minY, y)),
   };
+}
+
+/**
+ * Normalizes a fit_score to the canonical 0..1 scale.
+ *
+ * Contract:
+ * - Canonical scale: 0.0 to 1.0 (e.g. 0.87 -> 0.87, 1 -> 1.0).
+ * - Numeric strings matching strict decimal format (e.g. "0.85", "8.7", "1") are parsed safely.
+ * - Explicit legacy fallback:
+ *   - 1 < v <= 10: divided by 10 (e.g. 8.7 -> 0.87, 6.2 -> 0.62, 10 -> 1.0).
+ *   - 10 < v <= 100: divided by 100 (e.g. 87 -> 0.87, 62 -> 0.62, 100 -> 1.0).
+ * - Values > 100 are rejected as out-of-range (returns undefined; never silently clamped to 1.0).
+ * - Non-numeric strings, empty strings, NaN, Infinity, null, and non-supported types return undefined.
+ */
+export function normalizeFitScore(v: unknown): number | undefined {
+  if (v == null) return undefined;
+
+  let num: number;
+  if (typeof v === "number") {
+    num = v;
+  } else if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (!trimmed) return undefined;
+    // Strict numeric pattern: digits, optional leading sign, optional single decimal point
+    if (!/^[+-]?\d+(?:\.\d+)?$/.test(trimmed)) return undefined;
+    num = Number(trimmed);
+  } else {
+    return undefined;
+  }
+
+  if (!Number.isFinite(num)) return undefined;
+  if (num < 0) return 0;
+  if (num > 100) return undefined; // Reject out-of-range rather than silently turning into 1.0
+
+  let normalized: number;
+  if (num <= 1) {
+    normalized = num;
+  } else if (num <= 10) {
+    normalized = num / 10;
+  } else {
+    normalized = num / 100;
+  }
+
+  return Math.round(normalized * 1000) / 1000;
 }
 
 function intCount(v: unknown): number {
@@ -273,10 +317,17 @@ export function validateStrategy(
       );
       continue;
     }
+    const rawScore = c?.fit_score;
+    const normalizedScore = normalizeFitScore(rawScore);
+    if (rawScore !== undefined && normalizedScore === undefined) {
+      warnings.push(
+        `Candidate "${id}" received invalid fit_score; omitted from comparison audit.`,
+      );
+    }
     candidates.push({
       id,
       name: String(c?.name ?? "").trim().slice(0, 60) || id,
-      fit_score: isNum(c?.fit_score) ? Math.min(1, Math.max(0, c.fit_score)) : undefined,
+      fit_score: normalizedScore,
       strengths: asArray(c?.strengths)
         .map((s) => String(s ?? "").trim().slice(0, 200))
         .filter(Boolean)
@@ -390,6 +441,10 @@ export function validateStrategy(
           `Selection audit: "${picked.id}" was selected with fit ${picked.fit_score}, but "${top.id}" scores ${top.fit_score} — the comparison does not back the pick.`,
         );
       }
+    } else if (candidates.length >= 2 && scored.length < candidates.length) {
+      warnings.push(
+        `Selection audit: ${candidates.length - scored.length} candidate(s) lacked valid fit scores; full comparison audit could not be performed.`,
+      );
     }
   }
 
@@ -576,7 +631,7 @@ export function validateStrategy(
     }
   }
   /** True when the hero is available but not selected for this
-   *  attack (excluded by the model or by the 3-hero limit). */
+   *  attack (excluded by the model or by the battlefield hero limit). */
   const heroNotSelected = (slug: string): boolean => {
     const d = heroes.find((h) => h.id === slug);
     return d != null && !d.use;

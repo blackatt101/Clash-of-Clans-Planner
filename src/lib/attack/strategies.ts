@@ -72,9 +72,9 @@ export const STRATEGIES: AttackStrategyDef[] = [
   {
     id: "queen-charge-hybrid",
     name: "Queen Charge Hybrid",
-    minTH: 9,
+    minTH: 10,
     tags: ["hybrid", "hero-led"],
-    blurb: "Queen + Healers take a side, then Balloons, Hogs and Healers push in.",
+    blurb: "Queen Charge funnels and eliminates key defenses, followed by a Miner and Hog Rider hybrid surge into the core.",
   },
   {
     id: "witch-smash",
@@ -121,7 +121,7 @@ export const STRATEGIES: AttackStrategyDef[] = [
   {
     id: "e-drag",
     name: "E-Drag",
-    minTH: 12,
+    minTH: 11,
     tags: ["air", "spell-heavy"],
     blurb: "Electro Dragons with Balloons; lightning opens the air defenses.",
   },

@@ -771,12 +771,47 @@ function BaseImagePrompt({ onImage }: { onImage?: (url: string) => void }) {
   );
 }
 
-function parseLevels(raw: string): Record<string, number> | undefined {
+/**
+ * Official hero maximum levels up to Town Hall 18 (Clash of Clans Wiki):
+ * - Barbarian King: max 110 at TH18 (95 at TH16, 100 at TH17)
+ * - Archer Queen: max 110 at TH18 (95 at TH16, 100 at TH17)
+ * - Grand Warden: max 85 at TH18 (70 at TH16, 75 at TH17)
+ * - Royal Champion: max 55 at TH18 (45 at TH16, 50 at TH17)
+ * - Minion Prince: max 95 at TH18 (80 at TH16, 90 at TH17)
+ * - Dragon Duke: max 25 at TH18 (15 at TH16, 20 at TH17)
+ */
+export const HERO_MAX_LEVELS: Record<string, number> = {
+  barbarian_king: 110,
+  king: 110,
+  bk: 110,
+  archer_queen: 110,
+  queen: 110,
+  aq: 110,
+  grand_warden: 85,
+  warden: 85,
+  gw: 85,
+  royal_champion: 55,
+  champion: 55,
+  rc: 55,
+  minion_prince: 95,
+  prince: 95,
+  mp: 95,
+  dragon_duke: 25,
+  duke: 25,
+  dd: 25,
+};
+
+export function parseLevels(raw: string): Record<string, number> | undefined {
   if (!raw.trim()) return undefined;
   const out: Record<string, number> = {};
   for (const part of raw.split(/[,\s]+/)) {
     const m = part.match(/^([a-z_]+)\s*[:=]?\s*(\d{1,3})$/i);
-    if (m) out[m[1].toLowerCase()] = Math.max(1, Math.min(60, Number(m[2])));
+    if (m) {
+      const heroKey = m[1].toLowerCase();
+      const maxLvl = HERO_MAX_LEVELS[heroKey];
+      if (maxLvl === undefined) continue;
+      out[heroKey] = Math.max(1, Math.min(maxLvl, Number(m[2])));
+    }
   }
   return Object.keys(out).length ? out : undefined;
 }

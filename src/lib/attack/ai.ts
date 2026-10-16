@@ -126,8 +126,8 @@ export function buildSystemPrompt(request: AttackRequest): string {
   // housing means; the validator is the real enforcement point.
   const caps = capacitiesForTH(request.townHall);
   const maxTroopTH = request.townHall;
-  // Battlefield hero slots (game rule): one opens every
-  // two Town Halls from TH7 (TH9: 2, TH11: 3, TH13: 4, TH15: 5).
+  // Battlefield hero slots (game rule): 1 at TH7-8, 2 at TH9-10,
+  // 3 at TH11-12, and capped at 4 for TH13-18.
   const heroLimit = heroBattlefieldLimit(maxTroopTH);
   const troops = Object.values(TROOPS)
     .filter((t) => (t.minTH ?? 1) <= maxTroopTH)
@@ -367,7 +367,7 @@ export function buildSystemPrompt(request: AttackRequest): string {
     "   {",
     '     "id": "queen-charge-hybrid",',
     '     "name": "Queen Charge Hybrid",',
-    '     "fit_score": 8.7,',
+    '     "fit_score": 0.87,',
     '     "strengths": [',
     '       "Queen dapat menghapus hero musuh dan Inferno di kompartemen barat",',
     '       "Hybrid memiliki jalur langsung ke Town Hall melalui sisi selatan",',
@@ -382,9 +382,9 @@ export function buildSystemPrompt(request: AttackRequest): string {
     "",
     "   CRITICAL FIT_SCORE RULES:",
     "   - Scores MUST be base-specific, derived from actual base characteristics",
-    "   - DO NOT use arbitrary generic scores (0.85, 0.80, 0.75...)",
+    "   - DO NOT use arbitrary generic scores (e.g. all identical 0.85)",
     "   - Different candidates MUST have meaningfully different scores",
-    "   - Score range: 0.0 (completely unsuitable) to 10.0 (perfect fit)",
+    "   - Score range: 0.0 (completely unsuitable) to 1.0 (perfect fit, e.g. 0.87)",
     "   - A strategy with excellent troops but poor pathing: LOWER score",
     "   - A strategy with difficult funnel: LOWER score",
     "   - A strategy with inefficient spell usage: LOWER score",
@@ -395,9 +395,9 @@ export function buildSystemPrompt(request: AttackRequest): string {
     "",
     "   | Strategy           | TH Access | Pathing | Defense | Funnel | Risk | Fit Score |",
     "   |--------------------|-----------|---------|---------|--------|------|-----------|",
-    "   | QC Hybrid          | Excellent | Exc     | Exc     | Medium | Med  | 8.8       |",
-    "   | Zap Dragons        | Excellent | Medium  | Good    | Easy   | Low  | 7.9       |",
-    "   | Lavaloon           | Medium    | Good    | Exc     | Hard   | High | 7.5       |",
+    "   | QC Hybrid          | Excellent | Exc     | Exc     | Medium | Med  | 0.88      |",
+    "   | Zap Dragons        | Excellent | Medium  | Good    | Easy   | Low  | 0.79      |",
+    "   | Lavaloon           | Medium    | Good    | Exc     | Hard   | High | 0.75      |",
     "",
     "   The comparison MUST be based on the ACTUAL base you analyzed.",
     "   DO NOT overfit to the first candidate that looks good.",

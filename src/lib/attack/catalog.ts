@@ -48,15 +48,20 @@ export function resolveSlug(input: string): string | null {
 }
 
 /**
- * Battlefield hero slots by Town Hall: the first slot opens
- * at TH7 and another opens every two Town Halls (TH9: 2,
- * TH11: 3, TH13: 4, TH15: 5, TH17: 6 — all six heroes).
- * The AI chooses which heroes fill the slots; the validator
- * enforces the count.
+ * Battlefield hero slots by Town Hall:
+ * Based on Hero Hall progression:
+ * TH < 7: 0 heroes
+ * TH 7-8: 1 hero slot (Hero Hall Lv 1-2)
+ * TH 9-10: 2 hero slots (Hero Hall Lv 3-4)
+ * TH 11-12: 3 hero slots (Hero Hall Lv 5-6)
+ * TH 13-18: 4 hero slots (Hero Hall Lv 7-12)
+ *
+ * Even though up to 6 heroes can be unlocked (BK, AQ, MP, GW, RC, DD),
+ * Clash of Clans strictly caps attacks to at most 4 heroes.
  */
 export function heroBattlefieldLimit(th: number): number {
   if (th < 7) return 0;
-  return Math.min(1 + Math.floor((th - 7) / 2), 6);
+  return Math.min(1 + Math.floor((th - 7) / 2), 4);
 }
 
 /** Full entity lookup by slug or alias; unknown ids return null. */

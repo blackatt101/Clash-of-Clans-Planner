@@ -3,11 +3,13 @@
  * Covers slug resolution, per-TH capacities, coordinate clamping, and the
  * validator's reject/repair rules (task §39 validation tests).
  */
-import { resolveEntity, resolveSlug, capacitiesForTH, totalHousing, isCcEligible } from "../src/lib/attack/catalog";
-import { validateStrategy, clampPoint } from "../src/lib/attack/validate";
+import { resolveEntity, resolveSlug, capacitiesForTH, totalHousing, isCcEligible, heroBattlefieldLimit } from "../src/lib/attack/catalog";
+import { validateStrategy, clampPoint, normalizeFitScore } from "../src/lib/attack/validate";
 import { resolveStrategyId, strategyById, strategyMinTH, STRATEGIES } from "../src/lib/attack/strategies";
 import { arrowHead, pathD, placeLabels, rectsOverlap, simplifyPath, simplifyPathIndexed, toVb, type PlacedLabel, type Rect } from "../src/lib/attack/geometry";
 import { pathStepIndex, spellStepIndex, stepVis, isRendered, VIS_OPACITY } from "../src/lib/attack/steps";
+import { checkRateLimit, resetRateLimit, getClientIp } from "../src/lib/attack/rateLimit";
+import { parseLevels, HERO_MAX_LEVELS } from "../src/components/attack/AIAttackStrategy";
 
 let pass = 0, fail = 0;
 const t = (name: string, cond: boolean, extra = '') => {
@@ -409,15 +411,18 @@ cap.deployment_plan.push({ step: 3, phase: 'air', unit: 'dragon-duke', count: 1,
 cap.paths.push({ step: 3, unit: 'dragon-duke', points: [{ x: 0.6, y: 0.4 }, { x: 0.7, y: 0.35 }], style: 'attack' });
 cap.hero_abilities = [{ hero: 'dragon-duke', trigger: 'When the duke reaches the core', purpose: 'Soar over the core.' }];
 const rCap = validateStrategy(cap, { townHall: 15 });
-t('cap: TH15 keeps the first five selected heroes',
-  (rCap.strategy.heroes?.filter((h) => h.use).length ?? 0) === 5);
-t('cap: sixth hero excluded with the limit as its reason',
+t('cap: TH15 keeps the first four selected heroes (max 4 battlefield limit)',
+  (rCap.strategy.heroes?.filter((h) => h.use).length ?? 0) === 4);
+t('cap: fifth hero (royal-champion) excluded with the 4-hero limit as its reason',
+  rCap.strategy.heroes?.find((h) => h.id === 'royal-champion')?.reason
+    === 'Battlefield limit: at most 4 heroes can be deployed per attack.');
+t('cap: sixth hero (dragon-duke) excluded with the 4-hero limit as its reason',
   rCap.strategy.heroes?.find((h) => h.id === 'dragon-duke')?.reason
-    === 'Battlefield limit: at most 5 heroes can be deployed per attack.');
+    === 'Battlefield limit: at most 4 heroes can be deployed per attack.');
 t('cap: excluded hero has no role',
   rCap.strategy.heroes?.find((h) => h.id === 'dragon-duke')?.role === null);
 t('cap: warning records the limit',
-  rCap.warnings.some((w) => /exceeds the 5-hero battlefield limit/.test(w)));
+  rCap.warnings.some((w) => /exceeds the 4-hero battlefield limit/.test(w)));
 t('cap: over-limit hero deployment step dropped',
   rCap.strategy.deployment_plan.every((s) => s.unit !== 'dragon-duke'));
 t('cap: over-limit hero path dropped',
@@ -821,6 +826,305 @@ t('fixture: a coherent plan raises no selection audit',
   !rFix.warnings.some((w) => /Selection audit/.test(w)) &&
     !rFix.warnings.some((w) => /does not back the pick/.test(w)),
   JSON.stringify(rFix.warnings));
+
+// =========================================================================
+// Phase 1 Regression & Security Tests
+// =========================================================================
+
+// --- 1. heroBattlefieldLimit across TH6-18 ---
+const expectedHeroLimits: [number, number][] = [
+  [6, 0], [7, 1], [8, 1], [9, 2], [10, 2], [11, 3], [12, 3],
+  [13, 4], [14, 4], [15, 4], [16, 4], [17, 4], [18, 4],
+];
+for (const [th, expectedLimit] of expectedHeroLimits) {
+  const actual = heroBattlefieldLimit(th);
+  t(`heroBattlefieldLimit TH${th} === ${expectedLimit}`, actual === expectedLimit, `got ${actual}`);
+}
+
+// --- 2. Strategy catalog minTH and description corrections ---
+t('minTH Queen Charge Hybrid === 10', strategyMinTH('queen-charge-hybrid') === 10);
+t('minTH Electro Dragon === 11', strategyMinTH('e-drag') === 11);
+const hybridStrategy = strategyById('queen-charge-hybrid');
+t('Hybrid strategy description mentions Queen Charge, Miner, and Hog Rider',
+  hybridStrategy != null &&
+  /Queen Charge/i.test(hybridStrategy.blurb) &&
+  /Miner/i.test(hybridStrategy.blurb) &&
+  /Hog Rider/i.test(hybridStrategy.blurb));
+
+// --- 3. fit_score normalization and regression checks ---
+t('normalizeFitScore undefined/invalid',
+  normalizeFitScore(undefined) === undefined &&
+  normalizeFitScore(null) === undefined &&
+  normalizeFitScore('foo') === undefined &&
+  normalizeFitScore(NaN) === undefined);
+
+t('normalizeFitScore preserves 0..1 scale',
+  normalizeFitScore(0.87) === 0.87 &&
+  normalizeFitScore(0.62) === 0.62 &&
+  normalizeFitScore(0.82) === 0.82 &&
+  normalizeFitScore(1.0) === 1.0 &&
+  normalizeFitScore(0) === 0);
+
+t('normalizeFitScore normalizes 0..10 model scale',
+  normalizeFitScore(8.7) === 0.87 &&
+  normalizeFitScore(6.2) === 0.62 &&
+  normalizeFitScore(10) === 1.0);
+
+t('normalizeFitScore normalizes 0..100 percentage scale',
+  normalizeFitScore(85) === 0.85 &&
+  normalizeFitScore(100) === 1.0);
+
+t('normalizeFitScore rejects out-of-range values (> 100 never clamps to 1.0)',
+  normalizeFitScore(150) === undefined &&
+  normalizeFitScore(9999) === undefined);
+
+t('normalizeFitScore parses valid numeric strings strictly',
+  normalizeFitScore("0.85") === 0.85 &&
+  normalizeFitScore("8.7") === 0.87 &&
+  normalizeFitScore("1") === 1.0 &&
+  normalizeFitScore("  0.62  ") === 0.62 &&
+  normalizeFitScore("100") === 1.0);
+
+t('normalizeFitScore rejects invalid strings and non-finite values',
+  normalizeFitScore("") === undefined &&
+  normalizeFitScore("   ") === undefined &&
+  normalizeFitScore("0x12") === undefined &&
+  normalizeFitScore("1e5") === undefined &&
+  normalizeFitScore("NaN") === undefined &&
+  normalizeFitScore("Infinity") === undefined &&
+  normalizeFitScore(Infinity) === undefined &&
+  normalizeFitScore(-Infinity) === undefined);
+
+t('normalizeFitScore clamps negative bounds to 0',
+  normalizeFitScore(-5) === 0 &&
+  normalizeFitScore("-0.5") === 0);
+
+// Regression proof: 8.7 and 6.2 MUST NOT both clamp to 1.0
+t('REGRESSION: 8.7 and 6.2 normalize to different values (0.87 !== 0.62, neither is 1.0)',
+  normalizeFitScore(8.7) === 0.87 &&
+  normalizeFitScore(6.2) === 0.62 &&
+  normalizeFitScore(8.7) !== normalizeFitScore(6.2) &&
+  normalizeFitScore(8.7) !== 1.0 &&
+  normalizeFitScore(6.2) !== 1.0);
+
+// Validate candidate strategies with 8.7 and 6.2 preserves differentiation in validateStrategy
+const fitScorePlan = JSON.parse(JSON.stringify(base));
+fitScorePlan.strategy = { name: 'Queen Charge Hybrid', type: 'queen-charge-hybrid', reason: 'test' };
+fitScorePlan.candidate_strategies = [
+  { id: 'queen-charge-hybrid', name: 'QCH', fit_score: 8.7, selected: true },
+  { id: 'lavaloon', name: 'Lavaloon', fit_score: 6.2, selected: false },
+];
+const rFit = validateStrategy(fitScorePlan, { townHall: 15 });
+const s0 = rFit.strategy.candidate_strategies?.[0]?.fit_score;
+const s1 = rFit.strategy.candidate_strategies?.[1]?.fit_score;
+t('validateStrategy normalizes candidates fit_score from 0..10 to 0..1 without clamping both to 1.0',
+  rFit.ok && s0 === 0.87 && s1 === 0.62 && (s0 as unknown) !== (s1 as unknown));
+
+// Selection audit regression test: if lower score (6.2 -> 0.62) is selected over higher score (8.7 -> 0.87),
+// the validator detects the discrepancy and warns. (If both were clamped to 1.0, this warning would NOT fire!)
+const badPickPlan = JSON.parse(JSON.stringify(base));
+badPickPlan.strategy = { name: 'Lavaloon', type: 'lavaloon', reason: 'test' };
+badPickPlan.candidate_strategies = [
+  { id: 'queen-charge-hybrid', name: 'QCH', fit_score: 8.7, selected: false },
+  { id: 'lavaloon', name: 'Lavaloon', fit_score: 6.2, selected: true },
+];
+const rBadPick = validateStrategy(badPickPlan, { townHall: 15 });
+t('REGRESSION: selection audit catches lower fit_score candidate picked when input was 0..10 scale',
+  rBadPick.warnings.some((w) => /Selection audit: "lavaloon" was selected with fit 0.62, but "queen-charge-hybrid" scores 0.87/i.test(w)));
+
+// --- 4. Rate limiter unit tests ---
+resetRateLimit();
+const testIp = '192.168.1.100';
+const r1Limit = checkRateLimit(testIp, 3, 60_000);
+t('rateLimit: first request allowed', r1Limit.allowed && r1Limit.remaining === 2);
+const r2Limit = checkRateLimit(testIp, 3, 60_000);
+t('rateLimit: second request allowed', r2Limit.allowed && r2Limit.remaining === 1);
+const r3Limit = checkRateLimit(testIp, 3, 60_000);
+t('rateLimit: third request allowed', r3Limit.allowed && r3Limit.remaining === 0);
+const r4Limit = checkRateLimit(testIp, 3, 60_000);
+t('rateLimit: fourth request rejected', !r4Limit.allowed && r4Limit.remaining === 0 && r4Limit.resetMs > 0);
+resetRateLimit(testIp);
+const r5Limit = checkRateLimit(testIp, 3, 60_000);
+t('rateLimit: allowed after reset', r5Limit.allowed && r5Limit.remaining === 2);
+resetRateLimit();
+
+// --- 5. IP extraction security tests (Cloudflare & Spoofing Defense) ---
+// Skenario A: Request melalui Cloudflare terpercaya (X-Real-IP adalah Cloudflare IP)
+const reqCfVerified = new Request('https://clashplanner.xyz', {
+  headers: {
+    'cf-connecting-ip': '203.0.113.195',
+    'x-real-ip': '162.158.1.5', // Sah Cloudflare edge IP
+    'x-forwarded-for': '1.2.3.4, 203.0.113.195, 162.158.1.5',
+  },
+});
+t('getClientIp: trusts CF-Connecting-IP when X-Real-IP is Cloudflare edge',
+  getClientIp(reqCfVerified) === '203.0.113.195');
+
+// Skenario B: Serangan langsung ke Origin VPS dengan memalsukan header CF-Connecting-IP
+const reqDirectForged = new Request('https://clashplanner.xyz', {
+  headers: {
+    'cf-connecting-ip': '1.2.3.4', // Pemalsuan
+    'x-real-ip': '198.51.100.99', // Penyerang asli (bukan Cloudflare)
+    'x-forwarded-for': '5.6.7.8, 198.51.100.99',
+  },
+});
+t('getClientIp: rejects forged CF-Connecting-IP on direct origin access and falls back to X-Real-IP',
+  getClientIp(reqDirectForged) === '198.51.100.99');
+
+// Skenario C: Client mencoba memalsukan X-Forwarded-For tanpa X-Real-IP (direct unverified access)
+const reqXffSpoof = new Request('https://clashplanner.xyz', {
+  headers: {
+    'x-forwarded-for': '1.1.1.1, 192.168.1.50',
+  },
+});
+t('getClientIp: rejects unverified X-Forwarded-For when X-Real-IP is absent and falls back to loopback',
+  getClientIp(reqXffSpoof) === '127.0.0.1');
+
+// Skenario C.2: Attacker mencoba memalsukan rate limit dengan merotasi X-Forwarded-For pada direct connection
+resetRateLimit();
+for (let i = 1; i <= 5; i++) {
+  const reqSpoof = new Request('http://origin:3000', {
+    headers: { 'x-forwarded-for': `10.0.0.${i}` },
+  });
+  const ip = getClientIp(reqSpoof);
+  const check = checkRateLimit(ip, 5, 60_000);
+  t(`XFF rotation defense: req ${i} pinned to 127.0.0.1 and allowed within limit`,
+    ip === '127.0.0.1' && check.allowed);
+}
+// Request ke-6 dengan IP palsu baru harus tetap DITOLAK karena bucket 127.0.0.1 sudah habis
+const reqSpoof6 = new Request('http://origin:3000', {
+  headers: { 'x-forwarded-for': '10.0.0.6' },
+});
+const ip6 = getClientIp(reqSpoof6);
+const check6 = checkRateLimit(ip6, 5, 60_000);
+t('XFF rotation defense: 6th request rejected despite rotating X-Forwarded-For header',
+  ip6 === '127.0.0.1' && !check6.allowed && check6.remaining === 0);
+resetRateLimit();
+
+// Skenario D: Nginx reverse proxy standar dengan X-Real-IP
+const mockReqReal = new Request('https://clashplanner.xyz', {
+  headers: { 'x-real-ip': '198.51.100.4' },
+});
+t('getClientIp: parses x-real-ip set by Nginx', getClientIp(mockReqReal) === '198.51.100.4');
+
+// Skenario E: Cloudflare IPv6 range (termasuk 2a06:98c0::/29)
+const reqCfIpv6 = new Request('https://clashplanner.xyz', {
+  headers: {
+    'cf-connecting-ip': '203.0.113.88',
+    'x-real-ip': '2a06:98c0::1234', // Valid Cloudflare IPv6
+  },
+});
+t('getClientIp: trusts CF-Connecting-IP when X-Real-IP is in Cloudflare IPv6 2a06:98c0::/29',
+  getClientIp(reqCfIpv6) === '203.0.113.88');
+
+const reqCfIpv6Edge = new Request('https://clashplanner.xyz', {
+  headers: {
+    'cf-connecting-ip': '203.0.113.88',
+    'x-real-ip': '2a06:98c7:ffff:ffff:ffff:ffff:ffff:ffff', // Boundary of /29
+  },
+});
+t('getClientIp: trusts CF-Connecting-IP at boundary of 2a06:98c0::/29',
+  getClientIp(reqCfIpv6Edge) === '203.0.113.88');
+
+const reqCfIpv6Outside = new Request('https://clashplanner.xyz', {
+  headers: {
+    'cf-connecting-ip': '1.2.3.4',
+    'x-real-ip': '2a06:98c8::1', // Outside 2a06:98c0::/29
+  },
+});
+t('getClientIp: rejects forged CF-Connecting-IP when IPv6 is outside Cloudflare CIDR',
+  getClientIp(reqCfIpv6Outside) === '2a06:98c8::1');
+
+// Skenario F: IPv4-mapped IPv6 address (e.g. ::ffff:162.158.1.5)
+const reqIpv4Mapped = new Request('https://clashplanner.xyz', {
+  headers: {
+    'cf-connecting-ip': '203.0.113.77',
+    'x-real-ip': '::ffff:162.158.1.5',
+  },
+});
+t('getClientIp: normalizes IPv4-mapped IPv6 and trusts CF-Connecting-IP',
+  getClientIp(reqIpv4Mapped) === '203.0.113.77');
+
+// Skenario G: Direct port 3000 bypass attempt without X-Real-IP (attacker sets forged CF-Connecting-IP)
+const reqDirectPort3000 = new Request('http://origin:3000', {
+  headers: {
+    'cf-connecting-ip': '1.1.1.1',
+  },
+});
+t('getClientIp: rejects forged CF-Connecting-IP when no trusted proxy headers exist',
+  getClientIp(reqDirectPort3000) === '127.0.0.1' && getClientIp(reqDirectPort3000) !== '1.1.1.1');
+
+// --- 6. Hero level parsing and cap validation tests ---
+t('parseLevels: empty string returns undefined', parseLevels('') === undefined && parseLevels('   ') === undefined);
+const validHeroStr = 'king:95, queen:95, warden:70, rc:45, mp:80, duke:20';
+const parsedHeroes = parseLevels(validHeroStr);
+t('parseLevels: parses all valid canonical heroes and aliases',
+  parsedHeroes?.king === 95 &&
+  parsedHeroes?.queen === 95 &&
+  parsedHeroes?.warden === 70 &&
+  parsedHeroes?.rc === 45 &&
+  parsedHeroes?.mp === 80 &&
+  parsedHeroes?.duke === 20
+);
+
+const aliasHeroStr = 'bk:100 aq:100 gw:80 champion:50 prince:90 dd:20';
+const parsedAliases = parseLevels(aliasHeroStr);
+t('parseLevels: handles whitespace separation and shorthand aliases',
+  parsedAliases?.bk === 100 &&
+  parsedAliases?.aq === 100 &&
+  parsedAliases?.gw === 80 &&
+  parsedAliases?.champion === 50 &&
+  parsedAliases?.prince === 90 &&
+  parsedAliases?.dd === 20
+);
+
+// Cap checks
+const overleveledStr = 'king:150 warden:100 rc:80 duke:40';
+const parsedCapped = parseLevels(overleveledStr);
+t('parseLevels: clamps hero levels to max TH18 levels',
+  parsedCapped?.king === HERO_MAX_LEVELS.king &&
+  parsedCapped?.warden === HERO_MAX_LEVELS.warden &&
+  parsedCapped?.rc === HERO_MAX_LEVELS.rc &&
+  parsedCapped?.duke === HERO_MAX_LEVELS.duke
+);
+
+// Rejection of unknown keys, non-heroes, and typos
+t('parseLevels: rejects non-heroes like pekka and bowler',
+  parseLevels('pekka:80, bowler:5, dragon:10') === undefined
+);
+t('parseLevels: rejects typo hero keys',
+  parseLevels('barb_king:50, archerqueen:50') === undefined
+);
+const mixedHeroes = parseLevels('king:90, pekka:50, queen:85, random_key:10');
+t('parseLevels: ignores invalid keys while keeping valid hero keys',
+  mixedHeroes !== undefined &&
+  mixedHeroes.king === 90 &&
+  mixedHeroes.queen === 85 &&
+  mixedHeroes.pekka === undefined &&
+  mixedHeroes.random_key === undefined
+);
+
+// --- 7. Candidate fit_score diagnostic warning tests ---
+const planInvalidScore: any = {
+  strategy: {
+    type: "queen-charge-hybrid",
+    name: "Hybrid",
+    description: "Queen Charge Hybrid",
+  },
+  candidate_strategies: [
+    { id: "queen-charge-hybrid", name: "Hybrid", fit_score: "not-a-number", selected: true },
+    { id: "zap-dragons", name: "Zap Dragons", fit_score: 150 }, // out of range (>100)
+  ],
+  army: { troops: [{ id: "miner", count: 10 }], spells: [{ id: "heal", count: 2 }] },
+  steps: [{ phase: "Main", order: 1, action: "Deploy", targets: ["base"] }],
+};
+const rInvalidScore = validateStrategy(planInvalidScore, { townHall: 14 });
+t('validateStrategy: adds warning for invalid non-numeric fit_score',
+  rInvalidScore.warnings.some((w) => /Candidate "queen-charge-hybrid" received invalid fit_score/i.test(w)));
+t('validateStrategy: adds warning for out-of-range fit_score',
+  rInvalidScore.warnings.some((w) => /Candidate "zap-dragons" received invalid fit_score/i.test(w)));
+t('validateStrategy: adds selection audit warning when candidates lack valid fit scores',
+  rInvalidScore.warnings.some((w) => /Selection audit: 2 candidate\(s\) lacked valid fit scores/i.test(w)));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
