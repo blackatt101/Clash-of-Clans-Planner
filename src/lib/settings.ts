@@ -8,7 +8,7 @@ export const HERO_CHAIN_OPTIONS: { value: HeroChain; label: string }[] = [
   { value: "plan", label: "For as long as the plan runs" },
   { value: "max", label: "Until the focused heroes are maxed" },
 ];
-export const MAX_HERO_LANES = 3;
+export const MAX_HERO_LANES = 5;
 export type LabPriority = "general" | "air" | "ground" | "farming";
 export type BuilderBaseStrategy = "general" | "rush6th";
 
@@ -56,7 +56,7 @@ export interface PlannerSettings {
   blocks: BlockSpec[];
   horizon: number; // seconds; 0 = unlimited
   /**
-   * How many builders are dedicated to hero upgrades (0 = none, up to 3).
+   * How many builders are dedicated to hero upgrades (0 = none, up to 5).
    *
    * A count rather than a switch because the question a player actually asks is
    * "how many heroes can run at once", and one lane was never the useful maximum:
